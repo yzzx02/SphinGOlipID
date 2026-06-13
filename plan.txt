@@ -1,0 +1,810 @@
+请基于当前已经整理好的纯 Python 项目 `SphinGOlipID_project_pyonly_v0.2` 继续开发 GUI 和后续功能模块。当前项目已经完成 notebook 到 `.py` 的初步转换，后续开发重点是：完善后端算法模块、统一数据接口、搭建 GUI 原型，并为后续桌面软件封装做准备。
+
+# 一、总体开发目标
+
+将当前纯 Python 项目发展成一个完整的 SphinGOlipID 鞘脂自动注释工具。
+
+项目的核心功能包括：
+
+1. 理论一级分子式库构建；
+2. MS1 候选结构检索；
+3. 规则驱动 MS/MS 碎片匹配；
+4. MS2 注释结果评分与排序；
+5. RT 校正与 RT-based validation；
+6. 注释结果去重与清理；
+7. 最终注释结果导出；
+8. GUI 界面操作；
+9. 图表可视化；
+10. 后续桌面软件打包。
+
+当前最重要的是：**不要重写 MS2 匹配算法逻辑**，只做接口整理、参数化、错误修复、模块连接和 GUI 封装。
+
+# 二、开发优先级
+
+开发顺序建议如下：
+
+## Phase 1：后端 API 稳定化
+
+目标：让所有核心算法都能通过统一函数调用，而不是依赖零散脚本。
+
+优先处理以下文件：
+
+```text
+src/sphingolipid_toolkit/ms2_legacy_core.py
+src/sphingolipid_toolkit/ms2_pipeline.py
+src/sphingolipid_toolkit/rt_validation.py
+src/sphingolipid_toolkit/result_cleaning.py
+src/sphingolipid_toolkit/io_utils.py
+src/sphingolipid_toolkit/scoring.py
+```
+
+需要完成：
+
+1. 检查所有函数输入输出；
+2. 删除剩余硬编码路径；
+3. 所有参数通过 config 或函数参数传入；
+4. 所有模块返回标准 DataFrame 或标准结果对象；
+5. 错误信息要清晰，例如缺文件、缺列、格式错误；
+6. 输出文件名统一；
+7. 中间结果和最终结果分开保存。
+
+建议设计统一配置类：
+
+```python
+from dataclasses import dataclass
+from pathlib import Path
+
+@dataclass
+class SphinGOlipIDConfig:
+    raw_ms2_dir: Path
+    precursor_dir: Path
+    ms1_library_path: Path
+    output_dir: Path
+
+    fragment_ppm: float = 20
+    min_fragment_intensity: float = 20
+    min_matched_fragments: int = 2
+    min_match_score: float = 0.35
+    top_n: int = 3
+
+    enable_rt_validation: bool = True
+    enable_deduplication: bool = True
+    save_intermediate: bool = True
+```
+
+所有 GUI、CLI、测试都应该调用这个统一 config。
+
+# 三、MS2 匹配模块完善计划
+
+MS2 匹配是当前核心模块，逻辑不要大改。
+
+需要重点完成：
+
+## 1. 输入文件检查
+
+运行前检查：
+
+1. MS/MS txt 文件是否存在；
+2. precursor target Excel 是否存在；
+3. MS1 theoretical library 是否存在；
+4. 输出目录是否可写；
+5. Excel 中必要列是否存在；
+6. m/z、RT、intensity 是否能转成数值。
+
+如果缺少必要列，需要明确报错，例如：
+
+```text
+Missing required column: Precursor m/z
+Missing required column: RT
+Missing required column: Formula
+```
+
+## 2. MS2 数据读取标准化
+
+需要将 MS2 txt 文件读取结果统一为 DataFrame，建议字段为：
+
+```text
+file_name
+scan_id
+precursor_mz
+rt
+fragment_mz
+fragment_intensity
+```
+
+不同来源的 MS2 txt 文件格式可能略有差异，因此读取函数需要尽量稳健。
+
+## 3. 候选结构检索
+
+根据 precursor m/z 从理论 MS1 library 中检索候选。
+
+需要支持：
+
+```text
+precursor_mz
+ppm_tolerance
+ion_mode
+adduct
+lipid_class
+```
+
+输出候选 DataFrame，字段建议包括：
+
+```text
+candidate_id
+lipid_name
+lipid_class
+formula
+adduct
+theoretical_mz
+observed_mz
+ppm_error
+```
+
+## 4. 理论 MS/MS 碎片生成
+
+保留现有规则，只整理接口。
+
+建议函数形式：
+
+```python
+generate_theoretical_fragments(candidate: dict) -> pd.DataFrame
+```
+
+输出字段：
+
+```text
+fragment_name
+fragment_type
+fragment_formula
+theoretical_mz
+evidence_level
+description
+```
+
+其中 `fragment_type` 可以包括：
+
+```text
+diagnostic
+headgroup
+lcb
+fatty_acyl
+glycan
+neutral_loss
+```
+
+## 5. 碎片匹配
+
+匹配实测 MS/MS 和理论 MS/MS。
+
+建议函数形式：
+
+```python
+match_fragments(
+    observed_fragments: pd.DataFrame,
+    theoretical_fragments: pd.DataFrame,
+    ppm_tolerance: float,
+    min_intensity: float,
+) -> pd.DataFrame
+```
+
+输出字段：
+
+```text
+observed_mz
+observed_intensity
+theoretical_mz
+fragment_name
+fragment_type
+ppm_error
+matched
+```
+
+## 6. 评分与排序
+
+保留原评分体系。
+
+但需要把评分输出标准化：
+
+```text
+matched_fragment_count
+matched_intensity_sum
+total_fragment_intensity
+matched_intensity_ratio
+ms2_match_score
+rank
+```
+
+每个 precursor 默认保留 top 3 candidates。
+
+# 四、RT validation 模块开发计划
+
+RT 模块用于辅助验证 MS2 注释结果，不替代 MS2 匹配。
+
+目标是实现文章中的：
+
+```text
+RT series extraction + RANSAC fitting + RT-based validation
+```
+
+## 1. 输入
+
+输入 MS2 注释结果表，至少包含：
+
+```text
+lipid_name
+lipid_class
+observed_rt
+carbon_number
+double_bond
+hydroxyl_number
+ms2_match_score
+```
+
+如果当前结果表没有这些结构字段，需要先写解析函数，从 lipid name 中解析。
+
+## 2. 同系物系列提取
+
+根据 lipid class、LCB 类型、脂肪酰基特征提取 homologous series。
+
+建议字段：
+
+```text
+series_id
+lipid_class
+base_structure
+carbon_number
+double_bond
+hydroxyl_number
+observed_rt
+```
+
+## 3. RANSAC RT 模型
+
+使用 RANSAC 建立 RT 趋势模型。
+
+功能：
+
+1. 根据同系物系列拟合 RT；
+2. 预测 predicted_rt；
+3. 计算 rt_error；
+4. 计算 relative_error；
+5. 标记 outlier。
+
+输出字段：
+
+```text
+observed_rt
+predicted_rt
+rt_error
+relative_error
+rt_validation_status
+```
+
+`rt_validation_status` 建议分为：
+
+```text
+pass
+warning
+outlier
+not_evaluated
+```
+
+## 4. RT 模块输出
+
+输出两个文件：
+
+```text
+rt_validation_results.xlsx
+rt_series_summary.xlsx
+```
+
+同时为 GUI 提供绘图数据：
+
+```text
+predicted_vs_observed
+rt_error_distribution
+series_fit_data
+```
+
+# 五、result_cleaning 去重模块开发计划
+
+该模块用于最终注释表清理。
+
+## 1. 去重逻辑
+
+根据以下信息判断是否重复：
+
+```text
+lipid_name
+observed_mz
+observed_rt
+adduct
+sample/file
+```
+
+默认 tolerance：
+
+```text
+m/z tolerance: 0.01 u 或 10 ppm
+RT tolerance: 5 s
+```
+
+需要做成可配置参数。
+
+## 2. 保留规则
+
+重复结果中优先保留：
+
+1. MS2 score 最高；
+2. 匹配碎片数更多；
+3. RT validation 通过；
+4. ppm error 更小；
+5. signal intensity 更高。
+
+但是要注意：不能误删真正的同分异构体。如果 RT 差异明显，应该保留为不同 isomer candidate。
+
+## 3. 输出
+
+输出：
+
+```text
+final_annotation_table.xlsx
+deduplication_report.xlsx
+class_summary.xlsx
+sample_summary.xlsx
+```
+
+# 六、formula_library 理论一级库模块开发计划
+
+该模块可以放在第二阶段开发，但接口需要提前预留。
+
+目标是根据鞘脂结构规则自动生成理论一级分子式库。
+
+## 1. 支持的结构参数
+
+需要支持：
+
+```text
+lipid_class
+LCB chain length
+LCB double bond
+LCB hydroxyl number
+fatty acyl chain length
+fatty acyl double bond
+fatty acyl hydroxyl number
+headgroup
+glycan composition
+glycan sequence
+modification
+adduct
+ion mode
+```
+
+## 2. 输出字段
+
+理论库输出至少包括：
+
+```text
+lipid_name
+lipid_class
+formula
+neutral_mass
+adduct
+theoretical_mz
+ion_mode
+lcb
+fatty_acyl
+glycan
+modification
+description
+```
+
+## 3. GUI 页面
+
+后续 GUI 中需要提供：
+
+1. 选择 lipid class；
+2. 设置链长范围；
+3. 设置不饱和度范围；
+4. 设置羟基化范围；
+5. 选择 adduct；
+6. 生成 library；
+7. 导出 Excel。
+
+# 七、Streamlit GUI 原型开发计划
+
+第一版 GUI 建议使用 Streamlit，因为开发速度快，便于调试。
+
+新增目录：
+
+```text
+gui/
+└── streamlit_app.py
+```
+
+启动命令：
+
+```bash
+streamlit run gui/streamlit_app.py
+```
+
+## 页面 1：Project setup
+
+功能：
+
+1. 上传或选择 raw MS2 txt 文件；
+2. 上传 precursor target Excel；
+3. 上传 MS1 theoretical library；
+4. 选择 output directory；
+5. 设置项目名称；
+6. 保存项目配置。
+
+界面参数：
+
+```text
+Raw MS2 files
+Precursor target files
+MS1 library
+Output folder
+Project name
+Ion mode
+```
+
+## 页面 2：MS2 matching parameters
+
+参数包括：
+
+```text
+fragment ppm tolerance
+minimum fragment intensity
+minimum matched fragments
+minimum MS2 score
+top-N candidates
+save intermediate files
+```
+
+默认值：
+
+```text
+fragment ppm tolerance = 20
+minimum fragment intensity = 20
+minimum matched fragments = 2
+minimum MS2 score = 0.35
+top-N candidates = 3
+```
+
+## 页面 3：Run MS2 matching
+
+功能：
+
+1. 点击按钮运行；
+2. 显示当前处理进度；
+3. 显示日志；
+4. 显示 warning/error；
+5. 运行完成后显示输出文件路径。
+
+GUI 不能直接写算法逻辑，必须调用：
+
+```python
+from sphingolipid_toolkit.ms2_pipeline import run_batch
+```
+
+## 页面 4：Results review
+
+展示最终注释表。
+
+需要支持筛选：
+
+```text
+lipid_class
+lipid_name
+MS2 score
+matched fragments
+RT range
+m/z range
+file/sample
+RT validation status
+```
+
+需要支持：
+
+1. 表格查看；
+2. 下载筛选结果；
+3. 查看单个 precursor 的 top candidates；
+4. 查看 matched fragments。
+
+## 页面 5：Visualization
+
+第一版至少实现：
+
+1. lipid class distribution bar plot；
+2. MS2 score distribution；
+3. matched fragment count distribution；
+4. top candidate score comparison；
+5. observed MS/MS vs matched theoretical fragments stick plot。
+
+第二版再加入：
+
+1. predicted RT vs observed RT；
+2. RT error histogram；
+3. homologous series RT fitting plot。
+
+## 页面 6：RT validation
+
+功能：
+
+1. 导入 MS2 annotation results；
+2. 设置 RANSAC 参数；
+3. 运行 RT validation；
+4. 显示 predicted vs observed plot；
+5. 显示 outlier list；
+6. 导出 RT validation result。
+
+## 页面 7：Result cleaning
+
+功能：
+
+1. 导入 annotation results；
+2. 设置 m/z tolerance；
+3. 设置 RT tolerance；
+4. 设置保留规则；
+5. 运行去重；
+6. 导出 final annotation table。
+
+# 八、GUI 与后端的连接方式
+
+GUI 不应该直接处理复杂算法。
+
+正确方式：
+
+```python
+config = SphinGOlipIDConfig(
+    raw_ms2_dir=raw_ms2_dir,
+    precursor_dir=precursor_dir,
+    ms1_library_path=ms1_library_path,
+    output_dir=output_dir,
+    fragment_ppm=fragment_ppm,
+    min_fragment_intensity=min_fragment_intensity,
+    min_matched_fragments=min_matched_fragments,
+    min_match_score=min_match_score,
+    top_n=top_n,
+)
+
+results = run_batch(config)
+```
+
+所有结果都应该由后端返回，GUI 只负责展示。
+
+# 九、日志系统
+
+需要加入日志系统，方便 GUI 显示运行状态。
+
+建议新增：
+
+```text
+src/sphingolipid_toolkit/logging_utils.py
+```
+
+日志等级：
+
+```text
+INFO
+WARNING
+ERROR
+DEBUG
+```
+
+运行时日志示例：
+
+```text
+[INFO] Loading MS1 library...
+[INFO] Reading MS2 file: sample_01.txt
+[INFO] Matching precursor 123 / 820
+[WARNING] No candidate found for precursor m/z 760.5842
+[INFO] Exporting results...
+[INFO] MS2 matching completed.
+```
+
+GUI 中需要显示这些日志。
+
+# 十、测试计划
+
+需要补充 tests。
+
+## 1. 单元测试
+
+测试：
+
+```text
+test_ms2_reader.py
+test_candidate_search.py
+test_fragment_matching.py
+test_scoring.py
+test_rt_validation.py
+test_result_cleaning.py
+```
+
+## 2. 集成测试
+
+测试完整流程：
+
+```text
+test_full_ms2_pipeline.py
+```
+
+使用小型 mock 数据，不要依赖真实大文件。
+
+## 3. GUI 测试
+
+第一阶段可以不做复杂 GUI 自动测试，但至少保证：
+
+```bash
+streamlit run gui/streamlit_app.py
+```
+
+能够正常启动。
+
+# 十一、文档完善计划
+
+需要补充以下文档：
+
+```text
+docs/USER_MANUAL.md
+docs/INPUT_FORMAT.md
+docs/OUTPUT_FORMAT.md
+docs/GUI_GUIDE.md
+docs/DEVELOPER_NOTES.md
+docs/ARTICLE_ALIGNMENT.md
+```
+
+其中 `ARTICLE_ALIGNMENT.md` 需要解释软件模块如何对应文章内容：
+
+```text
+Theoretical formula library
+Rule-based MS/MS fragment library
+MS2 matching and scoring
+RT correction model
+RT-based validation
+Final annotation table
+```
+
+# 十二、PySide6 桌面版计划
+
+Streamlit 原型稳定后，再开发桌面版。
+
+新增目录：
+
+```text
+desktop/
+├── main.py
+├── widgets/
+├── pages/
+└── resources/
+```
+
+桌面版功能：
+
+1. 文件选择；
+2. 参数设置；
+3. 运行按钮；
+4. 进度条；
+5. 日志窗口；
+6. 结果表格；
+7. 图表展示；
+8. 导出结果；
+9. 保存配置；
+10. 加载历史项目。
+
+桌面版技术栈：
+
+```text
+PySide6
+pandas
+matplotlib
+openpyxl
+pyinstaller
+```
+
+打包命令后续可以设计为：
+
+```bash
+pyinstaller desktop/main.py --name SphinGOlipID --onefile
+```
+
+# 十三、最终交付目标
+
+请按以下顺序交付：
+
+## v0.3
+
+目标：后端稳定版。
+
+包含：
+
+1. 统一 config；
+2. 稳定 MS2 pipeline；
+3. 清晰输入输出；
+4. 日志系统；
+5. 基础 tests；
+6. README 更新。
+
+## v0.4
+
+目标：Streamlit GUI 原型。
+
+包含：
+
+1. Project setup 页面；
+2. MS2 参数页面；
+3. Run 页面；
+4. Results review 页面；
+5. 基础可视化页面；
+6. 结果下载功能。
+
+## v0.5
+
+目标：RT validation 和去重模块接入 GUI。
+
+包含：
+
+1. RT validation 页面；
+2. result cleaning 页面；
+3. RT 图表；
+4. 去重报告；
+5. final annotation table 输出。
+
+## v0.6
+
+目标：理论库构建模块。
+
+包含：
+
+1. formula library generation；
+2. lipid class 参数设置；
+3. adduct 设置；
+4. theoretical MS1 library 导出；
+5. GUI 接入。
+
+## v1.0
+
+目标：完整工具版。
+
+包含：
+
+1. MS1 library；
+2. MS2 matching；
+3. RT validation；
+4. result cleaning；
+5. GUI；
+6. 文档；
+7. 示例数据；
+8. Windows 桌面版打包。
+
+# 十四、特别要求
+
+1. 不要重写 MS2 匹配算法；
+2. 不要改变原始评分逻辑，除非发现明确错误；
+3. 不要把 GUI 逻辑写进算法模块；
+4. 不要使用硬编码路径；
+5. 所有参数必须可配置；
+6. 所有输出文件名要统一；
+7. 所有错误要有清楚提示；
+8. GUI 调用后端 API，不直接处理核心算法；
+9. 后续模块可以先预留接口，不能乱写假算法；
+10. 项目代码需要能通过 `pytest` 和 `python -m compileall`。
+
+# 十五、推荐当前第一步任务
+
+请先完成 v0.3，也就是后端稳定版。
+
+第一步具体任务：
+
+1. 检查 `ms2_pipeline.py` 的主流程；
+2. 设计统一 `SphinGOlipIDConfig`；
+3. 让 CLI 和 GUI 都能调用同一个 `run_batch(config)`；
+4. 整理 MS2 输入输出格式；
+5. 加入日志；
+6. 加入基础测试；
+7. 确保小型 mock 数据能完整跑通；
+8. 再开始 Streamlit GUI。

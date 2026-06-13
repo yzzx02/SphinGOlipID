@@ -1,0 +1,8 @@
+spectrum:
+index:1
+scan start time,1.25,min
+target m/z,760.5, m/z
+binaryDataArray:
+binary: 0 100.0 150.0 
+binaryDataArray:
+binary: 0 25.0 30.0 

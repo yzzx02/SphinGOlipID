@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sphingolipid-toolkit"
+version = "0.3.0"
+description = "Project scaffold for SphinGOlipID sphingolipid MS/MS annotation workflow"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.23",
+    "pandas>=1.5",
+    "openpyxl>=3.1",
+    "xlsxwriter>=3.0",
+    "scikit-learn>=1.2",
+    "pyteomics>=4.6",
+]
+
+[project.scripts]
+sphingolipid-ms2 = "sphingolipid_toolkit.cli:main"
+sphingolipid-targeted-mzml = "sphingolipid_toolkit.targeted_mzml_pipeline:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
