@@ -174,6 +174,43 @@ intermediate/
 result_msms-{i}.xlsx
 ```
 
+## Run Desktop GUI
+
+The Tkinter desktop GUI keeps the earlier lab software layout while calling the
+current `run_batch(config)` backend:
+
+```bash
+python -m sphingolipid_toolkit.gui
+```
+
+After editable installation, the console script is also available:
+
+```bash
+sphingolipid-gui
+```
+
+The GUI accepts one raw TXT file, one precursor XLSX file, one MS1 database XLSX
+file, and an output folder. The selected single TXT/XLSX pair is mapped to the
+backend's configurable file-name patterns and processed as file index `1`.
+
+## Retention Time IUP Validation
+
+The cleaned RT/IUP workflow is available from `sphingolipid_toolkit.rt_iup`.
+It fits linear or quadratic RANSAC models for each lipid subclass and
+unsaturation, removes obvious IUP ordering violations, rescues strict candidates
+that sit between adjacent valid IUP curves, and draws final RT plots with solid
+fits and capped 95% confidence bands.
+
+```python
+import pandas as pd
+from sphingolipid_toolkit.rt_iup import fit_rt_iup, prepare_rank_table, write_rt_iup_plots
+
+rank_table = pd.read_excel("SphinGOlipID_rank5_normalized_raw_2d_rt.xlsx")
+prepared = prepare_rank_table(rank_table, dataset_name="top5")
+result = fit_rt_iup(prepared)
+write_rt_iup_plots(result.plot_rows, result.lines, "rt_plots")
+```
+
 ## Use from Python
 
 ```python
