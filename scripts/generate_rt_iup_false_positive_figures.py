@@ -351,12 +351,8 @@ def main() -> None:
         figure_score_distribution(payloads),
         figure_overlap(payloads),
     ]
-    write_summary_tables(payloads, stats)
     for path in paths:
         print(path)
-    print(OUT_DIR / "summary_counts.csv")
-    print(OUT_DIR / "class_removal_stats.csv")
-    print(OUT_DIR / "annotation_removal_stats.csv")
 
 
 if __name__ == "__main__":
