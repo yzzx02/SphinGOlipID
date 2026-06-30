@@ -201,6 +201,44 @@ def _is_positive_monotonic(fit_type: str, params: list[float], x_min: float, x_m
     return bool((y_grid[-1] - y_grid[0]) > 0 and np.mean(np.diff(y_grid) < -0.01) <= 0.05)
 
 
+def _median_points_by_x(points: pd.DataFrame) -> pd.DataFrame:
+    clean = points[["x碳数", "归一化保留时间"]].dropna().copy()
+    if clean.empty:
+        return clean
+    return (
+        clean.astype({"x碳数": float, "归一化保留时间": float})
+        .groupby("x碳数", as_index=False)["归一化保留时间"]
+        .median()
+        .sort_values("x碳数")
+        .reset_index(drop=True)
+    )
+
+
+def _has_clear_decreasing_tail(points: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> bool:
+    """Detect obvious non-IUP tail drops in sorted scatter points."""
+
+    ordered = _median_points_by_x(points)
+    if len(ordered) < 3:
+        return False
+    y = ordered["归一化保留时间"].to_numpy(dtype=float)
+    diffs = np.diff(y)
+    clear_drop = diffs < -config.order_tolerance_min
+    if len(diffs) == 2:
+        return bool(clear_drop[-1])
+    return bool(clear_drop[-1] or np.sum(clear_drop) >= 2)
+
+
+def _has_clear_negative_short_slope(points: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> bool:
+    ordered = _median_points_by_x(points)
+    if len(ordered) != 2:
+        return False
+    x = ordered["x碳数"].to_numpy(dtype=float)
+    y = ordered["归一化保留时间"].to_numpy(dtype=float)
+    if x[1] <= x[0]:
+        return False
+    return bool(y[1] + config.iup_tolerance_min < y[0])
+
+
 def _fit_candidate_model(points: pd.DataFrame, fit_type: str, config: RTIUPConfig) -> dict[str, object] | None:
     min_samples = 2 if fit_type == "Linear" else 3
     if len(points) < min_samples or points["x碳数"].nunique() < 2:
@@ -233,9 +271,12 @@ def _fit_candidate_model(points: pd.DataFrame, fit_type: str, config: RTIUPConfi
     params = _model_params(model, fit_type)
     x_min = float(np.min(x[inliers]))
     x_max = float(np.max(x[inliers]))
+    inlier_points = points.loc[inliers].copy()
     if not math.isfinite(r2) or r2 < config.r2_threshold:
         return None
     if not _is_positive_monotonic(fit_type, params, x_min, x_max, config):
+        return None
+    if fit_type == "Quadratic" and _has_clear_decreasing_tail(inlier_points, config):
         return None
 
     return {
@@ -491,6 +532,35 @@ def point_iup_status(point: pd.Series, valid_lines: pd.DataFrame, config: RTIUPC
     return False, "无相邻有效曲线可判断IUP"
 
 
+def apply_short_series_guard(rows: pd.DataFrame, lines: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> pd.DataFrame:
+    """Remove short 1-2 point series with clear negative slope or IUP violations."""
+
+    if "点数不足保留" not in rows.columns:
+        return rows
+    guarded = rows.copy()
+    guarded["点数不足过滤原因"] = ""
+    short_rows = guarded[guarded["点数不足保留"].eq(True)]
+    if short_rows.empty:
+        return guarded
+
+    for (plot_group, unsat), group in short_rows.groupby(["细类", "曲线不饱和度"], sort=False):
+        idx = group.index
+        notes = group.get("IUP说明", pd.Series("", index=idx)).astype(str)
+        negative_slope = _has_clear_negative_short_slope(group, config)
+        explicit_violation = notes.str.startswith("IUP不满足").any()
+        if negative_slope:
+            reason = "点数不足曲线负斜率，去除"
+        elif explicit_violation:
+            reason = "点数不足曲线明显违反IUP，去除"
+        else:
+            continue
+        guarded.loc[idx, "点数不足保留"] = False
+        guarded.loc[idx, "是否作图"] = False
+        guarded.loc[idx, "IUP说明"] = reason
+        guarded.loc[idx, "点数不足过滤原因"] = reason
+    return guarded
+
+
 def find_bracket_lines(valid_lines: pd.DataFrame, unsat: float) -> tuple[pd.Series | None, pd.Series | None]:
     valid = valid_lines.copy()
     valid["_unsat"] = pd.to_numeric(valid["不饱和度"], errors="coerce")
@@ -539,6 +609,89 @@ def point_between_bracket(
         fraction = (target_unsat - low_unsat) / (high_unsat - low_unsat)
         expected_y = float(upper_y) - fraction * (float(upper_y) - float(lower_y))
     return True, f"位于{low_unsat:g}-{high_unsat:g}不饱和度曲线之间", abs(y - expected_y)
+
+
+def _is_judgeable_iup_point(note: str) -> bool:
+    skipped = (
+        "缺少x或保留时间",
+        "相邻曲线缺少x范围",
+        "x不在相邻有效曲线重叠范围",
+        "相邻曲线无法预测",
+        "相邻曲线在该x处交叉",
+    )
+    return not any(text in note for text in skipped)
+
+
+def apply_fitted_point_iup_guard(
+    rows: pd.DataFrame,
+    lines: pd.DataFrame,
+    config: RTIUPConfig = RTIUPConfig(),
+    min_supported_points: int = 2,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Drop fitted curves unless at least two inlier points satisfy bracket IUP."""
+
+    if rows.empty or lines.empty or "是否有效曲线" not in lines.columns:
+        return rows, lines
+
+    guarded_rows = rows.copy()
+    guarded_lines = lines.copy()
+    guarded_rows["拟合点IUP支持数"] = np.nan
+    guarded_rows["拟合点IUP判断数"] = np.nan
+    guarded_lines["拟合点IUP支持数"] = np.nan
+    guarded_lines["拟合点IUP判断数"] = np.nan
+
+    changed = True
+    while changed:
+        changed = False
+        valid_lines = guarded_lines[guarded_lines["是否有效曲线"].eq(True)].copy()
+        for plot_group, group_lines in valid_lines.groupby("细类", sort=False):
+            group_lines = group_lines.sort_values("不饱和度")
+            for line_idx, line in group_lines.iterrows():
+                unsat = finite(line.get("不饱和度"))
+                if unsat is None:
+                    continue
+                lower_line, higher_line = find_bracket_lines(group_lines, unsat)
+                if lower_line is None or higher_line is None:
+                    continue
+
+                point_mask = (
+                    guarded_rows["细类"].eq(plot_group)
+                    & guarded_rows["曲线不饱和度"].astype(float).eq(float(unsat))
+                    & guarded_rows["同曲线0.2min内点"].eq(True)
+                )
+                points = guarded_rows[point_mask].copy()
+                if points.empty:
+                    continue
+
+                supported = 0
+                judged = 0
+                for _, point in points.iterrows():
+                    ok, note, _ = point_between_bracket(point, lower_line, higher_line, config)
+                    if not _is_judgeable_iup_point(note):
+                        continue
+                    judged += 1
+                    if ok:
+                        supported += 1
+
+                guarded_rows.loc[point_mask, "拟合点IUP支持数"] = supported
+                guarded_rows.loc[point_mask, "拟合点IUP判断数"] = judged
+                guarded_lines.loc[line_idx, "拟合点IUP支持数"] = supported
+                guarded_lines.loc[line_idx, "拟合点IUP判断数"] = judged
+
+                if judged >= min_supported_points and supported < min_supported_points:
+                    reason = f"拟合曲线IUP支持点不足：{supported}/{judged}个点位于相邻曲线之间"
+                    guarded_lines.loc[line_idx, "是否有效曲线"] = False
+                    guarded_lines.loc[line_idx, "去除原因"] = reason
+                    guarded_rows.loc[point_mask, "是否有效曲线"] = False
+                    guarded_rows.loc[point_mask, "去除原因"] = reason
+                    guarded_rows.loc[point_mask, "同曲线0.2min内点"] = False
+                    guarded_rows.loc[point_mask, "是否作图"] = False
+                    guarded_rows.loc[point_mask, "IUP说明"] = reason
+                    changed = True
+                    break
+            if changed:
+                break
+    return guarded_rows, guarded_lines
 
 
 def line_between_bracket(
@@ -941,6 +1094,7 @@ def fit_rt_iup(
     rows["是否作图"] = rows["同曲线0.2min内点"]
     normal_mask = rows["是否作图"].eq(True) & ~rows.get("二次捞点", pd.Series(False, index=rows.index)).map(bool_value)
     rows.loc[normal_mask, "IUP说明"] = "有效拟合曲线，0.2min内点"
+    rows, lines = apply_fitted_point_iup_guard(rows, lines, config)
 
     if keep_short_series:
         for plot_group, idx in rows[rows["点数不足保留"]].groupby("细类").groups.items():
@@ -949,6 +1103,7 @@ def fit_rt_iup(
                 ok, note = point_iup_status(rows.loc[row_idx], valid, config)
                 rows.at[row_idx, "是否作图"] = ok
                 rows.at[row_idx, "IUP说明"] = note
+        rows = apply_short_series_guard(rows, lines, config)
 
     rows["最终保留"] = rows["同曲线0.2min内点"] | rows["点数不足保留"]
     rows["保留原因"] = np.where(
@@ -984,6 +1139,10 @@ def fit_rt_iup(
         "最终保留行数": int(len(final_rows)),
         "拟合内点保留行数": int(final_rows["同曲线0.2min内点"].sum()),
         "点数不足保留行数": int(final_rows["点数不足保留"].sum()),
+        "点数不足过滤行数": int(rows.get("点数不足过滤原因", pd.Series("", index=rows.index)).astype(str).ne("").sum()),
+        "拟合点IUP过滤曲线数": int(
+            lines.get("去除原因", pd.Series("", index=lines.index)).astype(str).str.contains("拟合曲线IUP支持点不足", regex=False).sum()
+        ),
         "作图点数": int(len(plot_rows)),
         "有效拟合曲线数": int(len(valid_lines)),
         "去除曲线数": int(lines["拟合成功"].eq(True).sum() - lines["是否有效曲线"].eq(True).sum()),
@@ -1169,6 +1328,7 @@ def write_rt_iup_plots(
 __all__ = [
     "RTIUPConfig",
     "RTIUPResult",
+    "apply_fitted_point_iup_guard",
     "apply_rescue_point_guard",
     "bool_value",
     "choose_iup_lines",
