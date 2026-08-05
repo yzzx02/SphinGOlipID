@@ -211,6 +211,48 @@ result = fit_rt_iup(prepared)
 write_rt_iup_plots(result.plot_rows, result.lines, "rt_plots")
 ```
 
+The current six-fraction workflow treats ECN and IUP as complementary RT
+validation modes:
+
+- ECN fits each unsaturation series independently after collapsing repeated
+  RT values at the same carbon number to their median. Outliers are removed
+  iteratively and the final model is refit on the stable inlier set.
+- IUP searches the original candidates independently within the locked
+  `0.20 min` RT window and `0.05 min` IUP allowance. Parallelism and ordering
+  guide candidate selection but do not silently relax either threshold.
+- Linear models are preferred unless a quadratic model has at least four
+  distinct carbon numbers and improves R² by at least `0.002`.
+- Plot legends report only the unsaturation and fitted R².
+
+## Six-fraction supplementary information
+
+The compact SI release is under
+`supplementary_data/SI_6fractions_20260805/`. It contains the six-fraction
+initial TOP3 identifications, the three ECN/IUP classification summaries,
+the retained RT results with explicit high/low score tiers, and the fitted-line table.
+The wide internal QA tables and raw Agilent `.d`/converted `.mzML` files are
+not included.
+
+The flat SI tables can be regenerated with:
+
+```bash
+python scripts/export_si_core_tables.py \
+  --input path/to/TOP3_RT_input_6_fractions_corrected.csv \
+  --results-root path/to/final_RT_results \
+  --output-dir supplementary_data/SI_6fractions_20260805 \
+  --include-low-score
+```
+
+The six-fraction reconstruction and figure workflow is implemented in:
+
+- `scripts/prepare_missing_fraction_workbooks.py`
+- `scripts/rebuild_six_fraction_initial_tables.py`
+- `scripts/build_top3_rt_input_from_fixed_csv.py`
+- `scripts/regenerate_top3_rt_ecn_iup_preview.py`
+- `scripts/build_final_filter_summary.py`
+- `scripts/build_ms1_rt_rescue.py`
+- `scripts/export_si_core_tables.py`
+
 ## Use from Python
 
 ```python

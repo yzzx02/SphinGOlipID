@@ -24,7 +24,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
-from scipy import stats
+from scipy import optimize, stats
 from sklearn.exceptions import UndefinedMetricWarning
 from sklearn.linear_model import LinearRegression, RANSACRegressor
 from sklearn.metrics import r2_score
@@ -36,7 +36,18 @@ import warnings
 warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
 
 
-DEFAULT_COLORS = ["#E64B35", "#4DBBD5", "#00A087", "#3C5488", "#F39B7F", "#8491B4"]
+DEFAULT_COLORS = [
+    "#E64B35",
+    "#4DBBD5",
+    "#00A087",
+    "#3C5488",
+    "#F39B7F",
+    "#8491B4",
+    "#91D1C2",
+    "#8E44AD",
+    "#7E6148",
+    "#B09C85",
+]
 
 
 @dataclass(frozen=True)
@@ -50,6 +61,17 @@ class RTIUPConfig:
     flat_y_range_min: float = 0.12
     flat_slope_min: float = 0.03
     rescue_min_distinct_x: int = 3
+    short_series_max_crossed_unsats: int = 1
+    max_refit_iterations: int = 5
+    quadratic_min_distinct_x: int = 4
+    quadratic_min_r2_gain: float = 0.002
+    parallel_min_overlap_x: float = 2.0
+    parallel_abs_slope_tolerance: float = 0.10
+    parallel_relative_slope_tolerance: float = 0.25
+    enable_iup_rescue: bool = True
+    iup_multistart_trials: int = 16
+    iup_max_candidates_per_unsaturation: int = 12
+    iup_beam_width: int = 192
     random_state: int = 42
     colors: tuple[str, ...] = tuple(DEFAULT_COLORS)
     figure_size: tuple[float, float] = (7.2, 7.2)
@@ -81,6 +103,19 @@ def finite(value: object) -> float | None:
     if not math.isfinite(parsed):
         return None
     return parsed
+
+
+def relative_rt_tolerance_min(config: RTIUPConfig = RTIUPConfig()) -> float:
+    """Return the worst-case relative RT allowance for two independent features.
+
+    Each feature keeps the configured ``rt_window_min`` drift allowance. When
+    two features or fitted series are compared for IUP order, their shifts can
+    occur in opposite directions, and the configured IUP tolerance is added on
+    top. The default is therefore ``0.20 + 0.20 + 0.05 = 0.45 min`` without
+    changing either locked threshold.
+    """
+
+    return 2.0 * float(config.rt_window_min) + float(config.iup_tolerance_min)
 
 
 def bool_value(value: object) -> bool:
@@ -239,39 +274,91 @@ def _has_clear_negative_short_slope(points: pd.DataFrame, config: RTIUPConfig = 
     return bool(y[1] + config.iup_tolerance_min < y[0])
 
 
-def _fit_candidate_model(points: pd.DataFrame, fit_type: str, config: RTIUPConfig) -> dict[str, object] | None:
-    min_samples = 2 if fit_type == "Linear" else 3
-    if len(points) < min_samples or points["x碳数"].nunique() < 2:
-        return None
-
-    x = points["x碳数"].astype(float).to_numpy().reshape(-1, 1)
-    y = points["归一化保留时间"].astype(float).to_numpy()
-    estimator = LinearRegression() if fit_type == "Linear" else make_pipeline(
+def _base_estimator(fit_type: str) -> object:
+    if fit_type == "Linear":
+        return LinearRegression()
+    return make_pipeline(
         PolynomialFeatures(2, include_bias=False),
         LinearRegression(),
     )
-    model = RANSACRegressor(
-        estimator=estimator,
+
+
+def _direct_model_params(model: object, fit_type: str) -> list[float]:
+    if fit_type == "Linear":
+        return [float(model.coef_[0]), float(model.intercept_)]
+    linear = model.named_steps["linearregression"]
+    return [float(linear.coef_[1]), float(linear.coef_[0]), float(linear.intercept_)]
+
+
+def iterative_refit(
+    points: pd.DataFrame,
+    fit_type: str,
+    config: RTIUPConfig = RTIUPConfig(),
+) -> tuple[object, pd.DataFrame] | None:
+    """RANSAC-seed a fit, remove residual outliers, and refit to stability.
+
+    Input points are first represented by one median RT per carbon number.  A
+    final ordinary least-squares fit is always performed on the stable inlier
+    set, so serialized parameters never come from an obsolete RANSAC sample.
+    """
+
+    active = _median_points_by_x(points)
+    min_distinct_x = 3 if fit_type == "Linear" else config.quadratic_min_distinct_x
+    min_samples = 2 if fit_type == "Linear" else 3
+    if len(active) < min_distinct_x:
+        return None
+
+    x = active["x碳数"].to_numpy(dtype=float).reshape(-1, 1)
+    y = active["归一化保留时间"].to_numpy(dtype=float)
+    ransac = RANSACRegressor(
+        estimator=_base_estimator(fit_type),
         min_samples=min_samples,
         residual_threshold=config.rt_window_min,
         random_state=config.random_state,
         max_trials=300,
     )
     try:
-        model.fit(x, y)
+        ransac.fit(x, y)
     except Exception:
         return None
-
-    pred = model.predict(x)
-    inliers = np.abs(y - pred) <= config.rt_window_min
-    if int(inliers.sum()) < 3:
+    seed_mask = np.asarray(ransac.inlier_mask_, dtype=bool)
+    if int(seed_mask.sum()) < min_distinct_x:
         return None
+    active = active.loc[seed_mask].copy()
 
-    r2 = float(r2_score(y[inliers], pred[inliers])) if int(inliers.sum()) >= 2 else np.nan
-    params = _model_params(model, fit_type)
-    x_min = float(np.min(x[inliers]))
-    x_max = float(np.max(x[inliers]))
-    inlier_points = points.loc[inliers].copy()
+    for _ in range(config.max_refit_iterations):
+        model = _base_estimator(fit_type)
+        x_active = active["x碳数"].to_numpy(dtype=float).reshape(-1, 1)
+        y_active = active["归一化保留时间"].to_numpy(dtype=float)
+        model.fit(x_active, y_active)
+        residual = np.abs(y_active - model.predict(x_active))
+        new_active = active.loc[residual <= config.rt_window_min].copy()
+        if new_active.index.equals(active.index):
+            break
+        if len(new_active) < min_distinct_x:
+            return None
+        active = new_active
+
+    final_model = _base_estimator(fit_type)
+    final_model.fit(
+        active["x碳数"].to_numpy(dtype=float).reshape(-1, 1),
+        active["归一化保留时间"].to_numpy(dtype=float),
+    )
+    return final_model, active
+
+
+def _fit_candidate_model(points: pd.DataFrame, fit_type: str, config: RTIUPConfig) -> dict[str, object] | None:
+    result = iterative_refit(points, fit_type, config)
+    if result is None:
+        return None
+    model, inlier_points = result
+    x = inlier_points["x碳数"].to_numpy(dtype=float).reshape(-1, 1)
+    y = inlier_points["归一化保留时间"].to_numpy(dtype=float)
+    pred = model.predict(x)
+    r2 = float(r2_score(y, pred))
+    params = _direct_model_params(model, fit_type)
+    x_min = float(np.min(x))
+    x_max = float(np.max(x))
     if not math.isfinite(r2) or r2 < config.r2_threshold:
         return None
     if not _is_positive_monotonic(fit_type, params, x_min, x_max, config):
@@ -283,8 +370,8 @@ def _fit_candidate_model(points: pd.DataFrame, fit_type: str, config: RTIUPConfi
         "拟合类型": fit_type,
         "参数": params,
         "R²": r2,
-        "点数": int(len(points)),
-        "内点数": int(inliers.sum()),
+        "代表点数": int(len(_median_points_by_x(points))),
+        "内点数": int(len(inlier_points)),
         "x最小": x_min,
         "x最大": x_max,
     }
@@ -295,13 +382,14 @@ def fit_line(group: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> dict[s
 
     plot_group = str(group["细类"].iloc[0])
     line_unsat = float(group["曲线不饱和度"].iloc[0])
-    points = (
+    raw_points = (
         group[["x碳数", "归一化保留时间"]]
         .dropna()
         .drop_duplicates()
         .sort_values(["x碳数", "归一化保留时间"])
         .reset_index(drop=True)
     )
+    fit_points = _median_points_by_x(raw_points)
     base = {
         "细类": plot_group,
         "不饱和度": line_unsat,
@@ -309,7 +397,9 @@ def fit_line(group: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> dict[s
         "拟合类型": None,
         "参数": None,
         "R²": None,
-        "点数": int(len(points)),
+        "点数": int(len(raw_points)),
+        "不同碳数": int(len(fit_points)),
+        "代表点数": int(len(fit_points)),
         "内点数": 0,
         "x最小": None,
         "x最大": None,
@@ -317,27 +407,130 @@ def fit_line(group: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> dict[s
         "是否有效曲线": False,
         "去除原因": "",
     }
-    if len(points) < 3:
+    if len(fit_points) < 3:
         base["失败原因"] = "少于3个点"
         return base
-    if points["x碳数"].nunique() < 2:
-        base["失败原因"] = "有效x少于2个"
-        return base
 
-    candidates = [_fit_candidate_model(points, "Linear", config), _fit_candidate_model(points, "Quadratic", config)]
-    candidates = [item for item in candidates if item is not None]
-    if not candidates:
+    linear_fit = _fit_candidate_model(fit_points, "Linear", config)
+    quadratic_fit = None
+    if len(fit_points) >= config.quadratic_min_distinct_x:
+        quadratic_fit = _fit_candidate_model(fit_points, "Quadratic", config)
+    if linear_fit is None and quadratic_fit is None:
         base["失败原因"] = "未达到R²或单调ECN要求"
         return base
-
-    def score(item: dict[str, object]) -> tuple[float, int, int]:
-        complexity_bonus = 0 if item["拟合类型"] == "Linear" else -1
-        return (float(item["R²"]), int(item["内点数"]), complexity_bonus)
-
-    best = sorted(candidates, key=score, reverse=True)[0]
+    if linear_fit is None:
+        best = quadratic_fit
+    elif quadratic_fit is None:
+        best = linear_fit
+    elif float(quadratic_fit["R²"]) - float(linear_fit["R²"]) < config.quadratic_min_r2_gain:
+        best = linear_fit
+    else:
+        best = quadratic_fit
+    assert best is not None
+    best["点数"] = int(len(raw_points))
+    best["不同碳数"] = int(len(fit_points))
     base.update(best)
     base["拟合成功"] = True
     return base
+
+
+def derivative_values(line: pd.Series, x: np.ndarray | float) -> np.ndarray:
+    """Return the first derivative of a serialized linear/quadratic fit."""
+
+    params = line.get("参数")
+    if isinstance(params, str):
+        params = json.loads(params)
+    arr = np.asarray(x, dtype=float)
+    if line.get("拟合类型") == "Linear" and isinstance(params, (list, tuple)) and len(params) == 2:
+        return np.full_like(arr, float(params[0]), dtype=float)
+    if line.get("拟合类型") == "Quadratic" and isinstance(params, (list, tuple)) and len(params) == 3:
+        return 2.0 * float(params[0]) * arr + float(params[1])
+    return np.full_like(arr, np.nan, dtype=float)
+
+
+def pair_parallel_status(
+    left: pd.Series,
+    right: pd.Series,
+    config: RTIUPConfig = RTIUPConfig(),
+) -> tuple[bool | None, dict[str, object]]:
+    """Evaluate slope parallelism over the shared carbon-number interval."""
+
+    left_min, left_max = finite(left.get("x最小")), finite(left.get("x最大"))
+    right_min, right_max = finite(right.get("x最小")), finite(right.get("x最大"))
+    if None in (left_min, left_max, right_min, right_max):
+        return None, {"平行性说明": "缺少拟合范围，无法判断"}
+    start = max(float(left_min), float(right_min))
+    end = min(float(left_max), float(right_max))
+    if end - start < config.parallel_min_overlap_x:
+        return None, {"平行性说明": "重叠碳数范围不足，无法判断"}
+
+    x_grid = np.linspace(start, end, 80)
+    left_slope = derivative_values(left, x_grid)
+    right_slope = derivative_values(right, x_grid)
+    valid = np.isfinite(left_slope) & np.isfinite(right_slope)
+    if not valid.any():
+        return None, {"平行性说明": "拟合导数不可用，无法判断"}
+    left_slope = left_slope[valid]
+    right_slope = right_slope[valid]
+    abs_diff = float(np.median(np.abs(left_slope - right_slope)))
+    reference = float(np.median(np.maximum(np.abs(left_slope), np.abs(right_slope))))
+    relative_diff = abs_diff / max(reference, 1e-8)
+    passed = bool(
+        abs_diff <= config.parallel_abs_slope_tolerance
+        or relative_diff <= config.parallel_relative_slope_tolerance
+    )
+    return passed, {
+        "斜率绝对差": abs_diff,
+        "斜率相对差": relative_diff,
+        "平行性说明": "通过" if passed else "相邻不饱和度曲线斜率差超过阈值",
+    }
+
+
+def apply_parallel_checks(
+    lines: pd.DataFrame,
+    config: RTIUPConfig = RTIUPConfig(),
+    *,
+    invalidate: bool = False,
+) -> pd.DataFrame:
+    """Annotate adjacent-unsaturation pairs, optionally invalidating failures.
+
+    The higher-unsaturation curve is compared with the immediately lower
+    available curve in the same class. ECN uses this as audit metadata only;
+    IUP may use it while searching/ranking alternatives. Insufficient overlap
+    is recorded as unjudgeable and never removes a curve.
+    """
+
+    checked = lines.copy()
+    defaults: dict[str, object] = {
+        "平行性是否通过": None,
+        "平行性参考曲线": "",
+        "斜率绝对差": np.nan,
+        "斜率相对差": np.nan,
+        "平行性说明": "",
+    }
+    for column, default in defaults.items():
+        checked[column] = default
+
+    for _, indices in checked.groupby("细类", sort=False).groups.items():
+        ordered = checked.loc[indices].sort_values("不饱和度", kind="mergesort")
+        successful = ordered[ordered["拟合成功"].eq(True)]
+        previous_index: int | None = None
+        for row_index, row in successful.iterrows():
+            if previous_index is None:
+                checked.at[row_index, "平行性说明"] = "最低不饱和度曲线，无下邻参考曲线"
+                previous_index = row_index
+                continue
+            reference = checked.loc[previous_index]
+            passed, detail = pair_parallel_status(reference, row, config)
+            checked.at[row_index, "平行性是否通过"] = passed
+            checked.at[row_index, "平行性参考曲线"] = str(reference.get("不饱和度"))
+            for column, value in detail.items():
+                checked.at[row_index, column] = value
+            if invalidate and passed is False:
+                checked.at[row_index, "是否有效曲线"] = False
+                checked.at[row_index, "去除原因"] = "相邻不饱和度曲线未通过平行性检查"
+            previous_index = row_index
+    return checked
 
 
 def line_y_range(line: pd.Series) -> float | None:
@@ -393,11 +586,16 @@ def pair_has_obvious_order_violation(lower: pd.Series, higher: pd.Series, config
     diff = diff[np.isfinite(diff)]
     if len(diff) == 0:
         return False
-    bad_fraction = float(np.mean(diff < -config.order_tolerance_min))
+    # This is a pre-correction feasibility test. Each independently fitted
+    # series may still move by ±rt_window_min, and the locked IUP tolerance is
+    # added only when comparing the two series. A curve is removed here only
+    # when even those bounded opposite shifts cannot repair the order.
+    tolerance = relative_rt_tolerance_min(config)
+    bad_fraction = float(np.mean(diff < -tolerance))
     return bool(
         bad_fraction >= 0.75
-        and float(np.median(diff)) < -config.order_tolerance_min
-        and float(np.mean(diff)) < -config.order_tolerance_min
+        and float(np.median(diff)) < -tolerance
+        and float(np.mean(diff)) < -tolerance
     )
 
 
@@ -494,6 +692,331 @@ def choose_iup_lines(lines: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -
     return lines
 
 
+def _iup_candidate_key(line: pd.Series) -> tuple[object, ...]:
+    params = line.get("参数")
+    if isinstance(params, str):
+        params = json.loads(params)
+    rounded = tuple(round(float(value), 5) for value in (params or []))
+    return (line.get("拟合类型"), rounded, finite(line.get("x最小")), finite(line.get("x最大")))
+
+
+def generate_iup_line_candidates(
+    group: pd.DataFrame,
+    initial_line: pd.Series,
+    config: RTIUPConfig = RTIUPConfig(),
+    *,
+    multistart: bool = True,
+) -> list[pd.Series]:
+    """Generate alternative real-data fits for one IUP unsaturation series.
+
+    ECN deliberately uses one median per carbon number. IUP additionally runs
+    deterministic multi-start RANSAC on the original RT candidates so a
+    coherent sub-series is not hidden by the per-carbon median of several
+    structural candidates. Every returned alternative still needs at least
+    three carbon numbers, R² >= the locked threshold, positive monotonicity,
+    and point-to-line residuals inside ``rt_window_min``.
+    """
+
+    plot_group = str(group["细类"].iloc[0])
+    unsat = float(group["曲线不饱和度"].iloc[0])
+    raw_points = (
+        group[["x碳数", "归一化保留时间"]]
+        .dropna()
+        .drop_duplicates()
+        .reset_index(drop=True)
+    )
+    records: list[pd.Series] = []
+    seen: set[tuple[object, ...]] = set()
+
+    def append_candidate(payload: dict[str, object] | pd.Series, source: str, rescued: bool) -> None:
+        record = pd.Series(payload).copy()
+        if "拟合成功" in record.index and not bool_value(record.get("拟合成功")):
+            return
+        record["细类"] = plot_group
+        record["不饱和度"] = unsat
+        record["拟合成功"] = True
+        record["是否有效曲线"] = True
+        record["失败原因"] = ""
+        record["去除原因"] = ""
+        record["点数"] = int(len(raw_points))
+        record["不同碳数"] = int(raw_points["x碳数"].nunique())
+        record["IUP候选来源"] = source
+        record["IUP重新寻优"] = rescued
+        # This is a full raw-candidate re-fit, not the older bracket-only
+        # 二次捞点 path; keeping the flags separate avoids applying bracket
+        # metadata guards to a globally optimized curve.
+        record["二次捞点"] = False
+        if rescued:
+            record["救回点数"] = int(record.get("内点数") or 0)
+            record["救回不同碳数"] = int(record.get("内点数") or 0)
+            record["救回说明"] = "IUP多起点原始候选寻优：阈值内重新选择同碳数代表点"
+        key = _iup_candidate_key(record)
+        if key not in seen:
+            seen.add(key)
+            records.append(record)
+
+    append_candidate(initial_line, "同碳数中位数初始拟合", False)
+    if multistart and len(raw_points) >= 3 and raw_points["x碳数"].nunique() >= 3:
+        carbon_groups = [part.reset_index(drop=True) for _, part in raw_points.groupby("x碳数", sort=True)]
+        branch_count = math.prod(len(part) for part in carbon_groups)
+        if branch_count <= 256:
+            for choices in itertools.product(*(range(len(part)) for part in carbon_groups)):
+                branch = pd.DataFrame(
+                    [part.iloc[choice] for part, choice in zip(carbon_groups, choices)]
+                ).reset_index(drop=True)
+                branch_candidate = _fit_candidate_model(branch, "Linear", config)
+                if branch_candidate is not None:
+                    append_candidate(branch_candidate, "逐碳数分支穷举RANSAC", True)
+
+        x_all = raw_points["x碳数"].to_numpy(dtype=float).reshape(-1, 1)
+        y_all = raw_points["归一化保留时间"].to_numpy(dtype=float)
+        for seed in range(max(0, int(config.iup_multistart_trials))):
+            # Also draw one observed candidate per carbon. This explicitly
+            # explores alternative structural branches when two or more RTs
+            # share the same total carbon number; raw-point RANSAC alone can
+            # repeatedly sample duplicate x values and miss that branch.
+            rng = np.random.default_rng(config.random_state + seed)
+            sampled_rows: list[pd.Series] = []
+            for _, carbon_group in raw_points.groupby("x碳数", sort=True):
+                sampled_rows.append(carbon_group.iloc[int(rng.integers(0, len(carbon_group)))])
+            sampled = pd.DataFrame(sampled_rows).reset_index(drop=True)
+            sampled_candidate = _fit_candidate_model(sampled, "Linear", config)
+            if sampled_candidate is not None:
+                append_candidate(sampled_candidate, "逐碳数分支抽样RANSAC", True)
+
+            ransac = RANSACRegressor(
+                estimator=LinearRegression(),
+                min_samples=3,
+                residual_threshold=config.rt_window_min,
+                random_state=config.random_state + seed,
+                max_trials=300,
+            )
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", UndefinedMetricWarning)
+                    ransac.fit(x_all, y_all)
+            except Exception:
+                continue
+            mask = np.asarray(ransac.inlier_mask_, dtype=bool)
+            if int(mask.sum()) < 3:
+                continue
+            representatives = _median_points_by_x(raw_points.loc[mask])
+            candidate = _fit_candidate_model(representatives, "Linear", config)
+            if candidate is not None:
+                append_candidate(candidate, "多起点原始候选RANSAC", True)
+
+    def rank(record: pd.Series) -> tuple[int, float, int]:
+        linear_bonus = 1 if record.get("拟合类型") == "Linear" else 0
+        return (
+            int(finite(record.get("内点数")) or 0),
+            float(finite(record.get("R²")) or 0.0),
+            linear_bonus,
+        )
+
+    records.sort(key=rank, reverse=True)
+    return records[: max(1, int(config.iup_max_candidates_per_unsaturation))]
+
+
+def solve_iup_vertical_shifts(
+    lines: list[pd.Series],
+    config: RTIUPConfig = RTIUPConfig(),
+) -> list[float] | None:
+    """Find the smallest whole-series shifts satisfying IUP order.
+
+    Each fitted series gets one constant offset bounded by ±0.20 min. The
+    slopes and within-series residuals are untouched. After correction, every
+    overlapping lower-unsaturation curve must remain above the corresponding
+    higher-unsaturation curve. Consecutive unsaturations target the locked
+    0.05 min IUP separation so they do not plot on top of one another; across
+    a missing-unsaturation gap the locked 0.08 min order tolerance is used.
+    ``None`` means no honest bounded correction exists.
+    """
+
+    n = len(lines)
+    if n == 0:
+        return []
+    # Variables are offsets followed by their absolute-value auxiliaries.
+    objective = np.r_[np.zeros(n), np.ones(n)]
+    a_ub: list[list[float]] = []
+    b_ub: list[float] = []
+    for left_index, left in enumerate(lines):
+        for right_index in range(left_index + 1, n):
+            right = lines[right_index]
+            start = max(float(left["x最小"]), float(right["x最小"]))
+            end = min(float(left["x最大"]), float(right["x最大"]))
+            if end - start < 0.5:
+                continue
+            x_grid = np.linspace(start, end, 80)
+            left_y = fit_prediction(left, x_grid)
+            right_y = fit_prediction(right, x_grid)
+            if left_y is None or right_y is None:
+                continue
+            left_unsat = float(left["不饱和度"])
+            right_unsat = float(right["不饱和度"])
+            # Consecutive unsaturations should be visibly separated by the
+            # locked 0.05 min IUP amount. Across a larger missing-unsaturation
+            # gap, enforce non-inversion with the locked 0.08 min tolerance but
+            # do not manufacture equal spacing through an unobserved series.
+            required_gap = (
+                config.iup_tolerance_min
+                if abs(right_unsat - left_unsat) <= 1.01
+                else -config.order_tolerance_min
+            )
+            rhs = float(
+                np.min(
+                    np.asarray(left_y, dtype=float)
+                    - np.asarray(right_y, dtype=float)
+                    - required_gap
+                )
+            )
+            constraint = [0.0] * (2 * n)
+            constraint[right_index] = 1.0
+            constraint[left_index] = -1.0
+            a_ub.append(constraint)
+            b_ub.append(rhs)
+
+    for index in range(n):
+        positive = [0.0] * (2 * n)
+        positive[index] = 1.0
+        positive[n + index] = -1.0
+        a_ub.append(positive)
+        b_ub.append(0.0)
+        negative = [0.0] * (2 * n)
+        negative[index] = -1.0
+        negative[n + index] = -1.0
+        a_ub.append(negative)
+        b_ub.append(0.0)
+
+    result = optimize.linprog(
+        objective,
+        A_ub=np.asarray(a_ub, dtype=float),
+        b_ub=np.asarray(b_ub, dtype=float),
+        bounds=[(-config.rt_window_min, config.rt_window_min)] * n
+        + [(0.0, config.rt_window_min)] * n,
+        method="highs",
+    )
+    if not result.success:
+        return None
+    return [float(value) for value in result.x[:n]]
+
+
+def _iup_candidate_set_score(
+    lines: list[pd.Series],
+    shifts: list[float],
+    config: RTIUPConfig,
+) -> tuple[float, ...]:
+    parallel_passes = 0
+    parallel_penalty = 0.0
+    for left, right in zip(lines, lines[1:]):
+        passed, detail = pair_parallel_status(left, right, config)
+        parallel_passes += int(passed is True)
+        relative = finite(detail.get("斜率相对差"))
+        parallel_penalty += relative if relative is not None else 2.0
+    return (
+        float(len(lines)),
+        float(sum(int(finite(line.get("内点数")) or 0) for line in lines)),
+        float(parallel_passes),
+        -parallel_penalty,
+        float(sum(finite(line.get("R²")) or 0.0 for line in lines)),
+        float(sum(line.get("拟合类型") == "Linear" for line in lines)),
+        -float(sum(abs(value) for value in shifts)),
+    )
+
+
+def optimize_iup_lines_for_group(
+    source: pd.DataFrame,
+    initial_lines: pd.DataFrame,
+    config: RTIUPConfig = RTIUPConfig(),
+    *,
+    multistart: bool = True,
+) -> pd.DataFrame:
+    """Choose the largest bounded, ordered, preferentially parallel IUP set."""
+
+    candidate_groups: list[tuple[float, list[pd.Series]]] = []
+    for unsat, group in source.groupby("曲线不饱和度", sort=True):
+        match = initial_lines[initial_lines["不饱和度"].astype(float).eq(float(unsat))]
+        if match.empty:
+            continue
+        candidates = generate_iup_line_candidates(
+            group,
+            match.iloc[0],
+            config,
+            multistart=multistart,
+        )
+        candidate_groups.append((float(unsat), candidates))
+
+    beam: list[tuple[list[pd.Series], list[float]]] = [([], [])]
+    for _, candidates in candidate_groups:
+        skipped_states = list(beam)
+        next_beam = list(skipped_states)  # Skipping a genuinely infeasible unsaturation is allowed.
+        for selected, _ in beam:
+            for candidate in candidates:
+                proposed = selected + [candidate]
+                shifts = solve_iup_vertical_shifts(proposed, config)
+                if shifts is not None:
+                    next_beam.append((proposed, shifts))
+        next_beam.sort(
+            key=lambda item: _iup_candidate_set_score(item[0], item[1], config),
+            reverse=True,
+        )
+        width = max(1, int(config.iup_beam_width))
+        reserve = min(len(skipped_states), max(1, width // 8))
+        skipped_states.sort(
+            key=lambda item: _iup_candidate_set_score(item[0], item[1], config),
+            reverse=True,
+        )
+        combined = next_beam[: max(0, width - reserve)] + skipped_states[:reserve]
+        deduplicated: list[tuple[list[pd.Series], list[float]]] = []
+        seen_states: set[tuple[object, ...]] = set()
+        for state in combined:
+            signature = tuple(
+                (float(line["不饱和度"]), _iup_candidate_key(line))
+                for line in state[0]
+            )
+            if signature in seen_states:
+                continue
+            seen_states.add(signature)
+            deduplicated.append(state)
+        beam = deduplicated[:width]
+
+    selected, shifts = max(
+        beam,
+        key=lambda item: _iup_candidate_set_score(item[0], item[1], config),
+    )
+    optimized = ensure_rescue_columns(initial_lines)
+    optimized["是否有效曲线"] = False
+    successful = optimized["拟合成功"].eq(True)
+    optimized.loc[successful, "去除原因"] = "IUP全局寻优未选中：固定漂移范围内无法与最终曲线组同时满足顺序"
+    for line, shift in zip(selected, shifts):
+        record = line.to_dict()
+        raw_params = record.get("参数")
+        if isinstance(raw_params, str):
+            raw_params = json.loads(raw_params)
+        shifted_params = list(raw_params or [])
+        if shifted_params:
+            shifted_params[-1] = float(shifted_params[-1]) + float(shift)
+        record["IUP原始参数"] = list(raw_params or [])
+        record["IUP_RT漂移校正(min)"] = float(shift)
+        record["参数"] = shifted_params
+        record["是否有效曲线"] = True
+        record["去除原因"] = ""
+        mask = optimized["细类"].eq(record["细类"]) & optimized["不饱和度"].astype(float).eq(float(record["不饱和度"]))
+        if not mask.any():
+            optimized = pd.concat([optimized, pd.DataFrame([record])], ignore_index=True)
+            continue
+        row_index = optimized.index[mask][0]
+        for column, value in record.items():
+            if column not in optimized.columns:
+                optimized[column] = None
+            optimized.at[row_index, column] = value
+    if "IUP_RT漂移校正(min)" not in optimized.columns:
+        optimized["IUP_RT漂移校正(min)"] = 0.0
+    optimized["IUP_RT漂移校正(min)"] = pd.to_numeric(
+        optimized["IUP_RT漂移校正(min)"], errors="coerce"
+    ).fillna(0.0)
+    return optimized
+
+
 def point_iup_status(point: pd.Series, valid_lines: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> tuple[bool, str]:
     """Return whether a 1-2 point series can be shown by IUP order alone."""
 
@@ -503,6 +1026,7 @@ def point_iup_status(point: pd.Series, valid_lines: pd.DataFrame, config: RTIUPC
     if x is None or y is None or unsat is None:
         return False, "缺少x/保留时间/不饱和度"
 
+    tolerance = relative_rt_tolerance_min(config)
     supports: list[str] = []
     violations: list[str] = []
     for _, line in valid_lines.iterrows():
@@ -516,12 +1040,12 @@ def point_iup_status(point: pd.Series, valid_lines: pd.DataFrame, config: RTIUPC
         if pred is None:
             continue
         if other_unsat < unsat:
-            if pred + config.iup_tolerance_min < y:
+            if pred + tolerance < y:
                 violations.append(f"低不饱和度{other_unsat:g}曲线未在上方")
             else:
                 supports.append(f"低不饱和度{other_unsat:g}曲线在上方")
         else:
-            if y + config.iup_tolerance_min < pred:
+            if y + tolerance < pred:
                 violations.append(f"高不饱和度{other_unsat:g}曲线未在下方")
             else:
                 supports.append(f"高不饱和度{other_unsat:g}曲线在下方")
@@ -538,7 +1062,10 @@ def apply_short_series_guard(rows: pd.DataFrame, lines: pd.DataFrame, config: RT
     if "点数不足保留" not in rows.columns:
         return rows
     guarded = rows.copy()
-    guarded["点数不足过滤原因"] = ""
+    if "点数不足过滤原因" not in guarded.columns:
+        guarded["点数不足过滤原因"] = ""
+    else:
+        guarded["点数不足过滤原因"] = guarded["点数不足过滤原因"].fillna("")
     short_rows = guarded[guarded["点数不足保留"].eq(True)]
     if short_rows.empty:
         return guarded
@@ -593,11 +1120,12 @@ def point_between_bracket(
     lower_y = finite(fit_prediction(higher_line, x))
     if upper_y is None or lower_y is None:
         return False, "相邻曲线无法预测", None
-    if float(upper_y) + config.order_tolerance_min < float(lower_y):
+    tolerance = relative_rt_tolerance_min(config)
+    if float(upper_y) + tolerance < float(lower_y):
         return False, "相邻曲线在该x处交叉", None
-    if y > float(upper_y) + config.iup_tolerance_min:
+    if y > float(upper_y) + tolerance:
         return False, "高于低不饱和度相邻曲线", None
-    if y < float(lower_y) - config.iup_tolerance_min:
+    if y < float(lower_y) - tolerance:
         return False, "低于高不饱和度相邻曲线", None
 
     low_unsat = finite(lower_line.get("不饱和度"))
@@ -611,6 +1139,65 @@ def point_between_bracket(
     return True, f"位于{low_unsat:g}-{high_unsat:g}不饱和度曲线之间", abs(y - expected_y)
 
 
+def crossed_unsaturation_count(lower_unsat: object, target_unsat: object, higher_unsat: object) -> int | None:
+    """Count skipped integer unsaturation values inside a bracket, excluding the target."""
+
+    low = finite(lower_unsat)
+    target = finite(target_unsat)
+    high = finite(higher_unsat)
+    if low is None or target is None or high is None or not (low < target < high):
+        return None
+    low_i = int(round(low))
+    target_i = int(round(target))
+    high_i = int(round(high))
+    return max(0, target_i - low_i - 1) + max(0, high_i - target_i - 1)
+
+
+def two_point_series_iup_status(
+    points: pd.DataFrame,
+    valid_lines: pd.DataFrame,
+    config: RTIUPConfig = RTIUPConfig(),
+) -> tuple[bool, str]:
+    """Validate a short two-point connector against a nearby IUP bracket."""
+
+    if points.empty:
+        return False, "短两点线缺少候选点"
+    target_unsat = finite(points["曲线不饱和度"].iloc[0])
+    if target_unsat is None:
+        return False, "短两点线缺少不饱和度"
+    lower_line, higher_line = find_bracket_lines(valid_lines, target_unsat)
+    if lower_line is None or higher_line is None:
+        return False, "短两点线过滤：缺少上下相邻有效曲线"
+
+    lower_unsat = finite(lower_line.get("不饱和度"))
+    higher_unsat = finite(higher_line.get("不饱和度"))
+    crossed = crossed_unsaturation_count(lower_unsat, target_unsat, higher_unsat)
+    if crossed is None:
+        return False, "短两点线过滤：无法计算上下相邻不饱和度跨度"
+    if crossed > config.short_series_max_crossed_unsats:
+        return (
+            False,
+            f"短两点线过滤：横跨{crossed}个不饱和度，超过最多{config.short_series_max_crossed_unsats}个",
+        )
+
+    unique_points = (
+        points[["x碳数", "归一化保留时间", "曲线不饱和度"]]
+        .dropna()
+        .drop_duplicates()
+        .sort_values(["x碳数", "归一化保留时间"])
+    )
+    if len(unique_points) != 2:
+        return False, f"短两点线过滤：唯一散点数为{len(unique_points)}，不是2"
+
+    notes: list[str] = []
+    for _, point in unique_points.iterrows():
+        ok, note, _ = point_between_bracket(point, lower_line, higher_line, config)
+        notes.append(note)
+        if not ok:
+            return False, "短两点线IUP不满足：" + note
+    return True, f"短两点线IUP满足：位于{lower_unsat:g}-{higher_unsat:g}不饱和度曲线之间，横跨{crossed}个不饱和度"
+
+
 def _is_judgeable_iup_point(note: str) -> bool:
     skipped = (
         "缺少x或保留时间",
@@ -618,8 +1205,93 @@ def _is_judgeable_iup_point(note: str) -> bool:
         "x不在相邻有效曲线重叠范围",
         "相邻曲线无法预测",
         "相邻曲线在该x处交叉",
+        "无相邻有效曲线可判断IUP",
     )
     return not any(text in note for text in skipped)
+
+
+def point_level_iup_status(point: pd.Series, valid_lines: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> tuple[bool, str]:
+    """Check one fitted inlier point against adjacent or one-sided IUP lines."""
+
+    unsat = finite(point.get("曲线不饱和度"))
+    if unsat is None:
+        return False, "缺少不饱和度"
+    lower_line, higher_line = find_bracket_lines(valid_lines, unsat)
+    if lower_line is not None and higher_line is not None:
+        ok, note, _ = point_between_bracket(point, lower_line, higher_line, config)
+        if ok or _is_judgeable_iup_point(note):
+            return ok, note
+    return point_iup_status(point, valid_lines, config)
+
+
+def apply_point_level_iup_guard(
+    rows: pd.DataFrame,
+    lines: pd.DataFrame,
+    config: RTIUPConfig = RTIUPConfig(),
+) -> pd.DataFrame:
+    """Remove only fitted inlier points that violate IUP while retaining good points."""
+
+    if rows.empty or lines.empty or "是否有效曲线" not in lines.columns:
+        return rows
+    guarded = rows.copy()
+    guarded["拟合点IUP支持数"] = np.nan
+    guarded["拟合点IUP判断数"] = np.nan
+    guarded["点级IUP是否通过"] = ""
+    guarded["点级IUP说明"] = ""
+    guarded["点级IUP过滤原因"] = ""
+
+    valid_lines = lines[lines["是否有效曲线"].eq(True)].copy()
+    for plot_group, group_lines in valid_lines.groupby("细类", sort=False):
+        group_lines = group_lines.sort_values("不饱和度")
+        for _, line in group_lines.iterrows():
+            unsat = finite(line.get("不饱和度"))
+            if unsat is None:
+                continue
+            point_mask = (
+                guarded["细类"].eq(plot_group)
+                & guarded["曲线不饱和度"].astype(float).eq(float(unsat))
+                & guarded["同曲线0.2min内点"].eq(True)
+            )
+            points = guarded[point_mask].copy()
+            if points.empty:
+                continue
+
+            decisions: dict[int, tuple[str, str]] = {}
+            supported = 0
+            judged = 0
+            for row_idx, point in points.iterrows():
+                ok, note = point_level_iup_status(point, group_lines, config)
+                if not _is_judgeable_iup_point(note):
+                    decisions[row_idx] = ("unjudged", note)
+                    continue
+                judged += 1
+                if ok:
+                    supported += 1
+                    decisions[row_idx] = ("pass", note)
+                else:
+                    decisions[row_idx] = ("fail", note)
+
+            guarded.loc[point_mask, "拟合点IUP支持数"] = supported
+            guarded.loc[point_mask, "拟合点IUP判断数"] = judged
+            for row_idx, (status, note) in decisions.items():
+                guarded.at[row_idx, "点级IUP说明"] = note
+                if status == "pass":
+                    guarded.at[row_idx, "点级IUP是否通过"] = True
+                    existing_note = str(guarded.at[row_idx, "IUP说明"] or "")
+                    if "点级IUP满足" not in existing_note:
+                        guarded.at[row_idx, "IUP说明"] = f"{existing_note}；点级IUP满足：{note}" if existing_note else f"点级IUP满足：{note}"
+                elif status == "fail":
+                    reason = "点级IUP不满足：" + note
+                    guarded.at[row_idx, "点级IUP是否通过"] = False
+                    guarded.at[row_idx, "点级IUP过滤原因"] = reason
+                    guarded.at[row_idx, "同曲线0.2min内点"] = False
+                    guarded.at[row_idx, "是否作图"] = False
+                    guarded.at[row_idx, "IUP说明"] = reason
+                    if "去除原因" in guarded.columns:
+                        guarded.at[row_idx, "去除原因"] = reason
+                else:
+                    guarded.at[row_idx, "点级IUP是否通过"] = ""
+    return guarded
 
 
 def apply_fitted_point_iup_guard(
@@ -723,9 +1395,10 @@ def line_between_bracket(
     ok = np.isfinite(y) & np.isfinite(upper_y) & np.isfinite(lower_y)
     if not np.any(ok):
         return False
-    if np.mean((upper_y[ok] + config.order_tolerance_min) < lower_y[ok]) > 0.10:
+    tolerance = relative_rt_tolerance_min(config)
+    if np.mean((upper_y[ok] + tolerance) < lower_y[ok]) > 0.10:
         return False
-    inside = (y[ok] <= upper_y[ok] + config.iup_tolerance_min) & (y[ok] >= lower_y[ok] - config.iup_tolerance_min)
+    inside = (y[ok] <= upper_y[ok] + tolerance) & (y[ok] >= lower_y[ok] - tolerance)
     return bool(np.mean(inside) >= 0.90)
 
 
@@ -764,41 +1437,15 @@ def _numeric_series(frame: pd.DataFrame, column: str, default: float) -> pd.Seri
 
 
 def _fit_rescue_candidate(points: pd.DataFrame, fit_type: str, config: RTIUPConfig) -> dict[str, object] | None:
-    x = points["x碳数"].astype(float).to_numpy()
-    y = points["归一化保留时间"].astype(float).to_numpy()
-    if len(points) < config.rescue_min_distinct_x or len(np.unique(x)) < config.rescue_min_distinct_x:
+    # Rescue candidates receive the same RANSAC -> iterative inlier removal ->
+    # final refit treatment as ordinary curves. Requiring every bracket-picked
+    # point to lie on one initial OLS curve was too brittle and could discard an
+    # otherwise coherent alternative because of a single local candidate.
+    candidate = _fit_candidate_model(points, fit_type, config)
+    if candidate is None:
         return None
-    degree = 1 if fit_type == "Linear" else 2
-    if len(np.unique(x)) < degree + 1:
-        return None
-    try:
-        coeff = np.polyfit(x, y, degree)
-    except Exception:
-        return None
-    params = [float(coeff[0]), float(coeff[1])] if fit_type == "Linear" else [float(coeff[0]), float(coeff[1]), float(coeff[2])]
-    pred = predict_values(fit_type, params, x)
-    if pred is None:
-        return None
-    pred = np.asarray(pred, dtype=float)
-    residual = np.abs(y - pred)
-    if not np.all(np.isfinite(residual)) or float(np.max(residual)) > config.rt_window_min:
-        return None
-    r2 = float(r2_score(y, pred)) if len(points) >= 2 else np.nan
-    if not math.isfinite(r2) or r2 < config.r2_threshold:
-        return None
-    x_min = float(np.min(x))
-    x_max = float(np.max(x))
-    if not _is_positive_monotonic(fit_type, params, x_min, x_max, config):
-        return None
-    return {
-        "拟合类型": fit_type,
-        "参数": params,
-        "R²": r2,
-        "点数": int(len(points)),
-        "内点数": int(len(points)),
-        "x最小": x_min,
-        "x最大": x_max,
-    }
+    candidate["点数"] = int(len(points))
+    return candidate
 
 
 def build_rescue_line(
@@ -836,9 +1483,27 @@ def build_rescue_line(
     if not candidates:
         return None
 
-    def score(item: dict[str, object]) -> tuple[float, int, int]:
+    def score(item: dict[str, object]) -> tuple[int, float, float, int, int]:
+        candidate_line = pd.Series(item)
+        parallel_results = [
+            pair_parallel_status(lower_line, candidate_line, config)[0],
+            pair_parallel_status(candidate_line, higher_line, config)[0],
+        ]
+        parallel_passes = sum(result is True for result in parallel_results)
+        slope_penalty = 0.0
+        for left, right in ((lower_line, candidate_line), (candidate_line, higher_line)):
+            _, detail = pair_parallel_status(left, right, config)
+            relative = finite(detail.get("斜率相对差"))
+            if relative is not None:
+                slope_penalty += relative
         complexity_bonus = 0 if item["拟合类型"] == "Linear" else -1
-        return (float(item["R²"]), int(item["内点数"]), complexity_bonus)
+        return (
+            parallel_passes,
+            -slope_penalty,
+            float(item["R²"]),
+            int(item["内点数"]),
+            complexity_bonus,
+        )
 
     best = sorted(candidates, key=score, reverse=True)[0]
     lower_unsat = finite(lower_line.get("不饱和度"))
@@ -1030,12 +1695,120 @@ def prepare_rank_table(
     return out[out["细类"].astype(str).str.len() > 0].reset_index(drop=True)
 
 
+def fit_ecn(
+    data: pd.DataFrame,
+    config: RTIUPConfig = RTIUPConfig(),
+    keep_short_series: bool = True,
+) -> RTIUPResult:
+    """Fit ECN curves first, using carbon-median representatives.
+
+    Curve parameters are estimated from median RT values at distinct carbon
+    numbers. The final ±RT-window decision is then applied to every original
+    row. Every curve is judged independently: cross-unsaturation parallelism
+    is recorded for audit only and never removes an ECN curve.
+    """
+
+    required = {"细类", "曲线不饱和度", "x碳数", "归一化保留时间"}
+    missing = required - set(data.columns)
+    if missing:
+        raise KeyError(f"Missing required column(s): {sorted(missing)}")
+    source = data.dropna(subset=list(required)).copy()
+    line_records = [
+        fit_line(group, config)
+        for _, group in source.groupby(["细类", "曲线不饱和度"], sort=False)
+    ]
+    lines = pd.DataFrame(line_records)
+    if lines.empty:
+        return RTIUPResult(rows=source.iloc[0:0], lines=lines, plot_rows=source.iloc[0:0], stats={})
+    lines["是否有效曲线"] = lines["拟合成功"].eq(True)
+    lines = apply_parallel_checks(lines, config, invalidate=False)
+
+    line_key_columns = [
+        "细类", "不饱和度", "拟合成功", "拟合类型", "参数", "R²", "点数",
+        "不同碳数", "代表点数", "内点数", "x最小", "x最大", "是否有效曲线",
+        "去除原因", "平行性是否通过", "平行性参考曲线", "斜率绝对差",
+        "斜率相对差", "平行性说明",
+    ]
+    line_key = lines[[column for column in line_key_columns if column in lines.columns]].copy()
+    line_key = line_key.rename(columns={"不饱和度": "曲线不饱和度"})
+    rows = source.merge(line_key, on=["细类", "曲线不饱和度"], how="left")
+
+    predictions: list[float | None] = []
+    for _, row in rows.iterrows():
+        predictions.append(
+            finite(predict_values(row.get("拟合类型"), row.get("参数"), row.get("x碳数")))
+        )
+    rows["预测保留时间"] = predictions
+    rows["保留时间偏差"] = rows["归一化保留时间"] - rows["预测保留时间"]
+    rows["保留时间绝对偏差"] = rows["保留时间偏差"].abs()
+    rows["同曲线0.2min内点"] = (
+        rows["拟合成功"].eq(True)
+        & rows["是否有效曲线"].eq(True)
+        & rows["保留时间绝对偏差"].le(config.rt_window_min)
+    )
+    rows["点数不足保留"] = False
+    if keep_short_series:
+        short_mask = rows["拟合成功"].eq(False) & rows["不同碳数"].between(1, 2, inclusive="both")
+        for _, indices in rows[short_mask].groupby(["细类", "曲线不饱和度"], sort=False).groups.items():
+            points = _median_points_by_x(rows.loc[indices, ["x碳数", "归一化保留时间"]])
+            keep = not _has_clear_negative_short_slope(points, config)
+            rows.loc[indices, "点数不足保留"] = keep
+
+    rows["最终保留"] = rows["同曲线0.2min内点"] | rows["点数不足保留"]
+    rows["是否作图"] = rows["最终保留"]
+    rows["保留原因"] = np.where(
+        rows["点数不足保留"],
+        "点数不足但ECN未见明确下降，保留",
+        np.where(rows["同曲线0.2min内点"], "ECN拟合通过且在0.2min内", ""),
+    )
+    final_rows = rows[rows["最终保留"]].copy()
+
+    line_stats: list[dict[str, object]] = []
+    for _, line in lines[lines["是否有效曲线"].eq(True)].sort_values(["细类", "不饱和度"]).iterrows():
+        points = final_rows[
+            final_rows["细类"].eq(line["细类"])
+            & final_rows["曲线不饱和度"].astype(float).eq(float(line["不饱和度"]))
+            & final_rows["同曲线0.2min内点"]
+        ]
+        x = points["x碳数"].astype(float).to_numpy()
+        y = points["归一化保留时间"].astype(float).to_numpy()
+        if len(points) < 3 or len(np.unique(x)) < 3:
+            continue
+        r_value, p_value = pearson_stats(x, y)
+        record = line.to_dict()
+        record["最终IUP点数"] = int(len(points))
+        record["最终IUP不同碳数"] = int(len(np.unique(x)))
+        record["Pearson r"] = r_value
+        record["Pearson p"] = p_value
+        record["拟合方程"] = equation_text(line)
+        line_stats.append(record)
+    valid_lines = pd.DataFrame(line_stats)
+    stats = {
+        "输入行数": int(len(source)),
+        "最终保留行数": int(len(final_rows)),
+        "拟合内点保留行数": int(final_rows["同曲线0.2min内点"].sum()),
+        "点数不足保留行数": int(final_rows["点数不足保留"].sum()),
+        "作图点数": int(len(final_rows)),
+        "有效拟合曲线数": int(len(valid_lines)),
+        "平行性未通过曲线数": int(lines["平行性是否通过"].eq(False).sum()),
+    }
+    return RTIUPResult(rows=final_rows, lines=valid_lines, plot_rows=final_rows, stats=stats)
+
+
 def fit_rt_iup(
     data: pd.DataFrame,
     config: RTIUPConfig = RTIUPConfig(),
     keep_short_series: bool = True,
 ) -> RTIUPResult:
-    """Run RT filtering using RANSAC fits, IUP ordering, and strict rescue."""
+    """Fit IUP independently from raw points, then coordinate nearby curves.
+
+    This is intentionally not derived from :func:`fit_ecn`. Initial curves are
+    fitted from the full source data, missing/order-conflicting unsaturations
+    are re-searched inside the locked RT window, and rescue candidates prefer
+    slopes that are closer to their neighbouring IUP curves. Parallelism is a
+    search preference and audit field, not an immediate reason to discard an
+    entire unsaturation.
+    """
 
     required = {"细类", "曲线不饱和度", "x碳数", "归一化保留时间"}
     missing = required - set(data.columns)
@@ -1045,9 +1818,34 @@ def fit_rt_iup(
     data = data.dropna(subset=list(required)).copy()
     line_records = [fit_line(group, config) for _, group in data.groupby(["细类", "曲线不饱和度"], sort=False)]
     lines = pd.DataFrame(line_records)
-    chosen_lines = [choose_iup_lines(group, config) for _, group in lines.groupby("细类", sort=False)]
-    lines = pd.concat(chosen_lines, ignore_index=True) if chosen_lines else ensure_rescue_columns(lines)
-    lines = rescue_missing_iup_lines(data, lines, config)
+    optimized_groups: list[pd.DataFrame] = []
+    for plot_group, group_lines in lines.groupby("细类", sort=False):
+        group_source = data[data["细类"].eq(plot_group)].copy()
+        initial_choice = choose_iup_lines(group_lines, config)
+        audit_choice = apply_parallel_checks(initial_choice, config, invalidate=False)
+        successful_but_removed = (
+            audit_choice["拟合成功"].eq(True)
+            & audit_choice["是否有效曲线"].ne(True)
+        ).any()
+        parallel_issue = audit_choice["平行性是否通过"].eq(False).any()
+        failed_but_searchable = (
+            audit_choice["拟合成功"].ne(True)
+            & pd.to_numeric(audit_choice.get("不同碳数"), errors="coerce").ge(3)
+        ).any()
+        needs_multistart = bool(
+            config.enable_iup_rescue
+            and (successful_but_removed or parallel_issue or failed_but_searchable)
+        )
+        optimized_groups.append(
+            optimize_iup_lines_for_group(
+                group_source,
+                group_lines,
+                config,
+                multistart=needs_multistart,
+            )
+        )
+    lines = pd.concat(optimized_groups, ignore_index=True) if optimized_groups else ensure_rescue_columns(lines)
+    lines = apply_parallel_checks(lines, config, invalidate=False)
 
     line_key_columns = [
         "细类",
@@ -1068,10 +1866,27 @@ def fit_rt_iup(
         "救回下界不饱和度",
         "救回上界不饱和度",
         "救回说明",
+        "平行性是否通过",
+        "平行性参考曲线",
+        "斜率绝对差",
+        "斜率相对差",
+        "平行性说明",
+        "IUP候选来源",
+        "IUP重新寻优",
+        "IUP原始参数",
+        "IUP_RT漂移校正(min)",
     ]
     line_key = lines[[col for col in line_key_columns if col in lines.columns]].copy()
     line_key = line_key.rename(columns={"不饱和度": "曲线不饱和度"})
     rows = data.merge(line_key, on=["细类", "曲线不饱和度"], how="left")
+    rows["IUP_RT漂移校正(min)"] = pd.to_numeric(
+        rows.get("IUP_RT漂移校正(min)", 0.0), errors="coerce"
+    ).fillna(0.0)
+    rows["原始归一化保留时间"] = rows["归一化保留时间"]
+    rows["归一化保留时间"] = (
+        pd.to_numeric(rows["归一化保留时间"], errors="coerce")
+        + rows["IUP_RT漂移校正(min)"]
+    )
 
     pred_values: list[float | None] = []
     for _, row in rows.iterrows():
@@ -1094,11 +1909,24 @@ def fit_rt_iup(
     rows["是否作图"] = rows["同曲线0.2min内点"]
     normal_mask = rows["是否作图"].eq(True) & ~rows.get("二次捞点", pd.Series(False, index=rows.index)).map(bool_value)
     rows.loc[normal_mask, "IUP说明"] = "有效拟合曲线，0.2min内点"
-    rows, lines = apply_fitted_point_iup_guard(rows, lines, config)
+    rows = apply_point_level_iup_guard(rows, lines, config)
 
     if keep_short_series:
-        for plot_group, idx in rows[rows["点数不足保留"]].groupby("细类").groups.items():
+        if "点数不足过滤原因" not in rows.columns:
+            rows["点数不足过滤原因"] = ""
+        short_rows = rows[rows["点数不足保留"]]
+        for (plot_group, unsat), idx in short_rows.groupby(["细类", "曲线不饱和度"], sort=False).groups.items():
             valid = lines[lines["细类"].eq(plot_group) & lines["是否有效曲线"].eq(True)].copy()
+            group = rows.loc[idx].copy()
+            unique_points = group[["x碳数", "归一化保留时间"]].dropna().drop_duplicates()
+            if len(unique_points) == 2:
+                ok, note = two_point_series_iup_status(group, valid, config)
+                rows.loc[idx, "是否作图"] = ok
+                rows.loc[idx, "IUP说明"] = note
+                if not ok:
+                    rows.loc[idx, "点数不足保留"] = False
+                    rows.loc[idx, "点数不足过滤原因"] = note
+                continue
             for row_idx in idx:
                 ok, note = point_iup_status(rows.loc[row_idx], valid, config)
                 rows.at[row_idx, "是否作图"] = ok
@@ -1126,8 +1954,14 @@ def fit_rt_iup(
         ].copy()
         x = pts["x碳数"].astype(float).to_numpy()
         y = pts["归一化保留时间"].astype(float).to_numpy()
+        final_point_count = int(len(pts))
+        final_distinct_x = int(pd.to_numeric(pts["x碳数"], errors="coerce").dropna().nunique())
+        if final_point_count < 3 or final_distinct_x < 2:
+            continue
         r_value, p_value = pearson_stats(x, y)
         record = line.to_dict()
+        record["最终IUP点数"] = final_point_count
+        record["最终IUP不同碳数"] = final_distinct_x
         record["Pearson r"] = r_value
         record["Pearson p"] = p_value
         record["拟合方程"] = equation_text(line)
@@ -1138,6 +1972,7 @@ def fit_rt_iup(
         "输入行数": int(len(data)),
         "最终保留行数": int(len(final_rows)),
         "拟合内点保留行数": int(final_rows["同曲线0.2min内点"].sum()),
+        "点级IUP过滤行数": int(rows.get("点级IUP过滤原因", pd.Series("", index=rows.index)).fillna("").astype(str).ne("").sum()),
         "点数不足保留行数": int(final_rows["点数不足保留"].sum()),
         "点数不足过滤行数": int(rows.get("点数不足过滤原因", pd.Series("", index=rows.index)).astype(str).ne("").sum()),
         "拟合点IUP过滤曲线数": int(
@@ -1148,8 +1983,127 @@ def fit_rt_iup(
         "去除曲线数": int(lines["拟合成功"].eq(True).sum() - lines["是否有效曲线"].eq(True).sum()),
         "二次捞点曲线数": int(lines.get("二次捞点", pd.Series(False, index=lines.index)).map(bool_value).sum()),
         "二次捞点保留行数": int(final_rows.get("二次捞点", pd.Series(False, index=final_rows.index)).map(bool_value).sum()),
+        "IUP重新寻优曲线数": int(lines.get("IUP重新寻优", pd.Series(False, index=lines.index)).map(bool_value).sum()),
+        "IUP重新寻优保留行数": int(final_rows.get("IUP重新寻优", pd.Series(False, index=final_rows.index)).map(bool_value).sum()),
     }
     return RTIUPResult(rows=final_rows, lines=valid_lines, plot_rows=plot_rows, stats=stats_payload)
+
+
+def filter_iup_from_ecn(
+    ecn: RTIUPResult,
+    config: RTIUPConfig = RTIUPConfig(),
+) -> RTIUPResult:
+    """Apply IUP ordering only to an already completed ECN result.
+
+    This function cannot fit or rescue a curve.  Both curve keys and row IDs
+    are asserted to remain strict subsets of their ECN inputs.
+    """
+
+    ecn_lines = ecn.lines.copy()
+    ecn_rows = ecn.rows.copy()
+    if ecn_lines.empty or ecn_rows.empty:
+        return RTIUPResult(
+            rows=ecn_rows.iloc[0:0].copy(),
+            lines=ecn_lines.iloc[0:0].copy(),
+            plot_rows=ecn_rows.iloc[0:0].copy(),
+            stats={"输入行数": int(len(ecn_rows)), "最终保留行数": 0, "有效拟合曲线数": 0},
+        )
+
+    selected_groups: list[pd.DataFrame] = []
+    for _, group in ecn_lines.groupby("细类", sort=False):
+        candidate = group.copy()
+        candidate["拟合成功"] = True
+        candidate["是否有效曲线"] = True
+        selected_groups.append(choose_iup_lines(candidate, config))
+    selected = pd.concat(selected_groups, ignore_index=True) if selected_groups else ecn_lines.iloc[0:0].copy()
+    valid_lines = selected[selected["是否有效曲线"].eq(True)].copy()
+    allowed_line_keys = set(
+        zip(valid_lines["细类"].astype(str), valid_lines["不饱和度"].astype(float))
+    )
+
+    rows = ecn_rows.copy()
+    row_keys = list(zip(rows["细类"].astype(str), rows["曲线不饱和度"].astype(float)))
+    fitted = rows.get("拟合成功", pd.Series(False, index=rows.index)).eq(True)
+    short = rows.get("点数不足保留", pd.Series(False, index=rows.index)).eq(True)
+    keep = pd.Series(
+        [((not is_fitted) or key in allowed_line_keys) and (is_fitted or is_short)
+         for key, is_fitted, is_short in zip(row_keys, fitted, short)],
+        index=rows.index,
+        dtype=bool,
+    )
+
+    # Short ECN series may remain only when their points obey the already-kept
+    # neighbouring ECN curves.  No curve is fitted or added here.
+    for (plot_group, unsat), indices in rows[short & keep].groupby(
+        ["细类", "曲线不饱和度"], sort=False
+    ).groups.items():
+        reference_lines = valid_lines[valid_lines["细类"].eq(plot_group)].copy()
+        group = rows.loc[indices].copy()
+        unique_points = _median_points_by_x(group[["x碳数", "归一化保留时间"]])
+        if len(unique_points) == 2:
+            ok, _ = two_point_series_iup_status(group, reference_lines, config)
+            if not ok:
+                keep.loc[indices] = False
+        else:
+            for row_index in indices:
+                ok, _ = point_iup_status(rows.loc[row_index], reference_lines, config)
+                if not ok:
+                    keep.at[row_index] = False
+
+    # Direct same-carbon order check, with the locked two-feature drift and IUP
+    # allowances.  It can only remove rows from the ECN subset.
+    tolerance = relative_rt_tolerance_min(config)
+    candidate_rows = rows[keep]
+    for _, group in candidate_rows.groupby(["细类", "x碳数"], sort=False):
+        medians = group.groupby("曲线不饱和度", sort=True)["归一化保留时间"].median().sort_index()
+        last_kept_rt: float | None = None
+        for unsat, rt_value in medians.items():
+            current_rt = float(rt_value)
+            if last_kept_rt is not None and current_rt > last_kept_rt + tolerance:
+                bad = group["曲线不饱和度"].astype(float).eq(float(unsat))
+                keep.loc[group.index[bad]] = False
+                continue
+            last_kept_rt = current_rt if last_kept_rt is None else min(last_kept_rt, current_rt)
+
+    final_rows = rows[keep].copy()
+    final_rows["最终保留"] = True
+    final_rows["是否作图"] = True
+    final_rows["保留原因"] = np.where(
+        final_rows.get("点数不足保留", pd.Series(False, index=final_rows.index)).eq(True),
+        "ECN点数不足保留且通过IUP顺序过滤",
+        "ECN拟合通过并通过IUP顺序过滤",
+    )
+    plot_rows = final_rows.copy()
+
+    remaining_curve_keys = set(
+        zip(
+            final_rows.loc[final_rows.get("拟合成功", pd.Series(False, index=final_rows.index)).eq(True), "细类"].astype(str),
+            final_rows.loc[final_rows.get("拟合成功", pd.Series(False, index=final_rows.index)).eq(True), "曲线不饱和度"].astype(float),
+        )
+    )
+    valid_lines = valid_lines[
+        [key in remaining_curve_keys for key in zip(valid_lines["细类"].astype(str), valid_lines["不饱和度"].astype(float))]
+    ].copy()
+
+    ecn_keys = set(zip(ecn_lines["细类"].astype(str), ecn_lines["不饱和度"].astype(float)))
+    iup_keys = set(zip(valid_lines["细类"].astype(str), valid_lines["不饱和度"].astype(float)))
+    assert iup_keys <= ecn_keys
+    if "合并后行ID" in ecn_rows.columns and "合并后行ID" in final_rows.columns:
+        assert set(final_rows["合并后行ID"].astype(str)) <= set(ecn_rows["合并后行ID"].astype(str))
+    else:
+        assert set(final_rows.index) <= set(ecn_rows.index)
+
+    stats = {
+        "输入行数": int(len(ecn_rows)),
+        "最终保留行数": int(len(final_rows)),
+        "拟合内点保留行数": int(final_rows.get("同曲线0.2min内点", pd.Series(False, index=final_rows.index)).sum()),
+        "点数不足保留行数": int(final_rows.get("点数不足保留", pd.Series(False, index=final_rows.index)).sum()),
+        "作图点数": int(len(plot_rows)),
+        "有效拟合曲线数": int(len(valid_lines)),
+        "IUP从ECN删除行数": int(len(ecn_rows) - len(final_rows)),
+        "IUP从ECN删除曲线数": int(len(ecn_lines) - len(valid_lines)),
+    }
+    return RTIUPResult(rows=final_rows, lines=valid_lines, plot_rows=plot_rows, stats=stats)
 
 
 def _design_matrix(x: np.ndarray, fit_type: object) -> np.ndarray:
@@ -1207,14 +2161,17 @@ def set_plot_style(config: RTIUPConfig = RTIUPConfig()) -> None:
     plt.rcParams["ytick.labelsize"] = config.tick_label_size
 
 
-def legend_label(unsat: object, group: pd.DataFrame) -> str:
+def legend_label(unsat: object, group: pd.DataFrame, line: pd.Series | None = None) -> str:
+    """Return a compact R-squared legend label for one unsaturation series."""
+
     base = f"{int(float(unsat))}"
-    x = group["x碳数"].astype(float).to_numpy()
-    y = group["归一化保留时间"].astype(float).to_numpy()
-    r_value, p_value = pearson_stats(x, y)
-    if r_value is None:
+    if line is None:
         return base
-    return f"{base}  r={r_value:.4f}, p={p_value}"
+
+    r_squared = finite(line.get("R²"))
+    if r_squared is None:
+        return base
+    return f"{base}  R²={r_squared:.4f}"
 
 
 def make_rt_iup_plot(
@@ -1260,10 +2217,14 @@ def make_rt_iup_plot(
                 alpha=0.82,
                 zorder=2,
             )
+        matching_lines = valid_lines[
+            pd.to_numeric(valid_lines.get("不饱和度"), errors="coerce").eq(float(unsat))
+        ] if not valid_lines.empty and "不饱和度" in valid_lines.columns else valid_lines.iloc[0:0]
+        legend_line = matching_lines.iloc[0] if not matching_lines.empty else None
         legend_handles.append(
             Line2D([0], [0], marker="o", linestyle="None", markersize=9.5, markerfacecolor=color, markeredgecolor="none", alpha=0.7)
         )
-        legend_labels.append(legend_label(unsat, group))
+        legend_labels.append(legend_label(unsat, group, legend_line))
 
     for _, line in valid_lines.iterrows():
         fit_unsat = finite(line.get("不饱和度"))
@@ -1329,19 +2290,27 @@ __all__ = [
     "RTIUPConfig",
     "RTIUPResult",
     "apply_fitted_point_iup_guard",
+    "apply_parallel_checks",
     "apply_rescue_point_guard",
     "bool_value",
     "choose_iup_lines",
     "color_for_unsaturation",
     "equation_text",
+    "derivative_values",
     "finite",
     "fit_line",
+    "fit_ecn",
     "fit_rt_iup",
+    "filter_iup_from_ecn",
+    "iterative_refit",
     "legend_label",
     "make_rt_iup_plot",
     "normalize_json_value",
     "parse_series_unsaturation",
+    "pair_parallel_status",
     "pearson_stats",
+    "apply_point_level_iup_guard",
+    "point_level_iup_status",
     "point_iup_status",
     "prepare_rank_table",
     "predict_values",

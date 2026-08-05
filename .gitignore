@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.codex_tmp/
 .venv/
 outputs/
 tests/output/
