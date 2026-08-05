@@ -174,6 +174,85 @@ intermediate/
 result_msms-{i}.xlsx
 ```
 
+## Run Desktop GUI
+
+The Tkinter desktop GUI keeps the earlier lab software layout while calling the
+current `run_batch(config)` backend:
+
+```bash
+python -m sphingolipid_toolkit.gui
+```
+
+After editable installation, the console script is also available:
+
+```bash
+sphingolipid-gui
+```
+
+The GUI accepts one raw TXT file, one precursor XLSX file, one MS1 database XLSX
+file, and an output folder. The selected single TXT/XLSX pair is mapped to the
+backend's configurable file-name patterns and processed as file index `1`.
+
+## Retention Time IUP Validation
+
+The cleaned RT/IUP workflow is available from `sphingolipid_toolkit.rt_iup`.
+It fits linear or quadratic RANSAC models for each lipid subclass and
+unsaturation, removes obvious IUP ordering violations, rescues strict candidates
+that sit between adjacent valid IUP curves, and draws final RT plots with solid
+fits and capped 95% confidence bands.
+
+```python
+import pandas as pd
+from sphingolipid_toolkit.rt_iup import fit_rt_iup, prepare_rank_table, write_rt_iup_plots
+
+rank_table = pd.read_excel("SphinGOlipID_rank5_normalized_raw_2d_rt.xlsx")
+prepared = prepare_rank_table(rank_table, dataset_name="top5")
+result = fit_rt_iup(prepared)
+write_rt_iup_plots(result.plot_rows, result.lines, "rt_plots")
+```
+
+The current six-fraction workflow treats ECN and IUP as complementary RT
+validation modes:
+
+- ECN fits each unsaturation series independently after collapsing repeated
+  RT values at the same carbon number to their median. Outliers are removed
+  iteratively and the final model is refit on the stable inlier set.
+- IUP searches the original candidates independently within the locked
+  `0.20 min` RT window and `0.05 min` IUP allowance. Parallelism and ordering
+  guide candidate selection but do not silently relax either threshold.
+- Linear models are preferred unless a quadratic model has at least four
+  distinct carbon numbers and improves R² by at least `0.002`.
+- Plot legends report only the unsaturation and fitted R².
+
+## Six-fraction supplementary information
+
+The compact SI release is under
+`supplementary_data/SI_6fractions_20260805/`. It contains the six-fraction
+initial TOP3 identifications, the three ECN/IUP classification summaries,
+the retained RT results with explicit high/low score tiers, and the fitted-line table.
+The wide internal QA tables and raw Agilent `.d`/converted `.mzML` files are
+not included.
+
+The flat SI tables can be regenerated with:
+
+```bash
+python scripts/export_si_core_tables.py \
+  --input path/to/TOP3_RT_input_6_fractions_corrected.csv \
+  --results-root path/to/final_RT_results \
+  --output-dir supplementary_data/SI_6fractions_20260805 \
+  --include-low-score
+```
+
+The six-fraction reconstruction and figure workflow is implemented in:
+
+- `scripts/prepare_missing_fraction_workbooks.py`
+- `scripts/rebuild_six_fraction_initial_tables.py`
+- `scripts/build_top3_rt_input_from_fixed_csv.py`
+- `scripts/regenerate_top3_rt_ecn_iup_preview.py`
+- `scripts/build_final_filter_summary.py`
+- `scripts/build_ms1_rt_rescue.py`
+- `scripts/export_si_core_tables.py`
+
 ## Use from Python
 
 ```python

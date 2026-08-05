@@ -1,0 +1,19 @@
+﻿classification_mode,filter_definition,initial_candidate_pairs,retained_candidate_pairs,unique_ms1_features,ms1_rt_rescued_pairs
+detailed_chain,ECN RT筛选后保留,9693,6554,1245,不适用
+detailed_chain,IUP RT筛选后保留,9693,5391,1136,不适用
+detailed_chain,ECN RT保留且 score≥0.50,9693,3459,1004,不适用
+detailed_chain,IUP RT保留且 score≥0.50,9693,2810,905,不适用
+detailed_chain,ECN、IUP同时保留且 score≥0.50,9693,2445,848,不适用
+detailed_chain,ECN或IUP任一保留且 score≥0.50,9693,3824,1036,不适用
+lcb_series,ECN RT筛选后保留,9693,5954,874,82
+lcb_series,IUP RT筛选后保留,9693,5645,819,87
+lcb_series,ECN RT保留且 score≥0.50,9693,2993,704,82
+lcb_series,IUP RT保留且 score≥0.50,9693,2916,642,87
+lcb_series,ECN、IUP同时保留且 score≥0.50,9693,2172,528,73
+lcb_series,ECN或IUP任一保留且 score≥0.50,9693,3737,817,96
+total_carbon_unsaturation,ECN RT筛选后保留,9693,5015,692,80
+total_carbon_unsaturation,IUP RT筛选后保留,9693,4683,656,102
+total_carbon_unsaturation,ECN RT保留且 score≥0.50,9693,2328,537,80
+total_carbon_unsaturation,IUP RT保留且 score≥0.50,9693,2279,520,102
+total_carbon_unsaturation,ECN、IUP同时保留且 score≥0.50,9693,1638,397,70
+total_carbon_unsaturation,ECN或IUP任一保留且 score≥0.50,9693,2969,660,112

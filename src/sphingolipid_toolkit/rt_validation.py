@@ -24,6 +24,15 @@ import pandas as pd
 from sklearn.linear_model import RANSACRegressor
 from sklearn.metrics import r2_score
 
+from .rt_iup import (
+    RTIUPConfig,
+    RTIUPResult,
+    fit_rt_iup,
+    make_rt_iup_plot,
+    prepare_rank_table,
+    write_rt_iup_plots,
+)
+
 LYSO_OR_BASE_CLASSES = {
     "So",
     "So1P",
@@ -279,3 +288,20 @@ def match_predicted_to_targets(
                 rows.append(pd.concat([pred_row, targets.iloc[target_pos]], axis=0))
 
     return pd.DataFrame(rows)
+
+
+__all__ = [
+    "RTIUPConfig",
+    "RTIUPResult",
+    "add_series_columns",
+    "find_missing_series_members",
+    "fit_ransac_models",
+    "fit_rt_iup",
+    "make_rt_iup_plot",
+    "match_predicted_to_targets",
+    "merge_excel_results",
+    "parse_lipid_series",
+    "predict_rt",
+    "prepare_rank_table",
+    "write_rt_iup_plots",
+]
