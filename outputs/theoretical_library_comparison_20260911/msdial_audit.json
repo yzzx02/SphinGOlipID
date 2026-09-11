@@ -1,0 +1,47 @@
+{
+  "unique_candidates": 223338,
+  "per_file": {
+    "MSDIAL-TandemMassSpectralAtlas-VS69-Neg.msp": {
+      "records": 606599,
+      "unique_candidates": 205521
+    },
+    "MSDIAL-TandemMassSpectralAtlas-VS69-Pos.msp": {
+      "records": 128551,
+      "unique_candidates": 116079
+    }
+  },
+  "included_class_records": {
+    "Cer_EBDS": 43218,
+    "AHexCer": 32400,
+    "ASM": 31248,
+    "Cer_ADS": 3519,
+    "Cer_AP": 28704,
+    "Cer_AS": 10557,
+    "Cer_BDS": 3519,
+    "Cer_BS": 10557,
+    "Cer_EODS": 87975,
+    "Cer_EOS": 91154,
+    "Cer_NDS": 21452,
+    "Cer_NP": 10557,
+    "Cer_NS": 57436,
+    "CerP": 336,
+    "GM3": 2530,
+    "HexCer_AP": 28704,
+    "HexCer_EOS": 12409,
+    "HexCer_NDS": 21452,
+    "HexCer_NS": 57436,
+    "HexCer_HDS": 1470,
+    "HexCer_HS": 4410,
+    "Hex2Cer": 40944,
+    "Hex3Cer": 40944,
+    "PE_Cer": 5336,
+    "PI_Cer": 2196,
+    "SHexCer": 7048,
+    "SM": 60104,
+    "SL": 17484,
+    "PhytoSph": 17,
+    "DHSph": 17,
+    "Sph": 17
+  },
+  "version": "VS69"
+}

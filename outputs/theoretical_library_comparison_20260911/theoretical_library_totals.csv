@@ -1,0 +1,9 @@
+﻿Software,Metric,Total,Definition
+SphinGOlipID,MS1 manuscript-reported entries,84240,Reported; differs from supplied CSV
+SphinGOlipID,MS1 supplied CSV records,85710,Includes duplicate names
+SphinGOlipID,MS1 supplied CSV unique names,79262,Exact name deduplication only
+SphinGOlipID,Raw chain combinations,14600646,User-approved paper ranges; no chemical-feasibility filtering
+MS-DIAL,VS69 unique sphingolipid reference candidates,223338,Positive and negative combined; native library ranges
+LipidIN,Local archive unique sphingolipid reference candidates,618422,Positive and negative combined; LEVEL and adduct duplicates removed
+LDA2,Recommended example MS1 list candidates,238,Example configuration only; software-wide total is not fixed
+LipiDetective,Fixed theoretical search library,,Not applicable; sequence prediction model

@@ -1,0 +1,52 @@
+{
+  "SphinGOlipID": {
+    "source_file": "常规鞘脂一级库3.0.csv",
+    "sha256": "227f76c55b6d2cecfb3f535620ec81fd2c1c0c0cf63367d70a748c3f2d9aafb0",
+    "manuscript_ms1": 84240,
+    "file_records": 85710,
+    "unique_names": 79262,
+    "duplicate_records": 6448,
+    "expansion": 14600646,
+    "expansion_by_chain_type": {
+      "two_variable_chains": 2589396,
+      "three_variable_chains": 12009064,
+      "single": 2185,
+      "fixed_named": 1
+    },
+    "unique_parents_by_type": {
+      "two_variable_chains": 73110,
+      "three_variable_chains": 3960,
+      "single": 2191
+    },
+    "templates_by_type": {
+      "two_variable_chains": 139,
+      "three_variable_chains": 4,
+      "single": 21
+    },
+    "lcb_c": [
+      12,
+      30
+    ],
+    "lcb_db": [
+      0,
+      5
+    ],
+    "fa_c": [
+      2,
+      42
+    ],
+    "fa_db": [
+      0,
+      3
+    ],
+    "chemically_filtered": false
+  },
+  "LDA2": {
+    "unique_species_candidates": 238,
+    "per_file": {
+      "LDA2_negative_noSphingoOH.xlsx": 238,
+      "LDA2_positive_noSphingoOH.xlsx": 238
+    },
+    "scope": "Official recommended example mass lists; not software capacity"
+  }
+}

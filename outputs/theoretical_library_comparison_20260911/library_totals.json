@@ -1,0 +1,113 @@
+{
+  "SphinGOlipID": {
+    "source_file": "常规鞘脂一级库3.0.csv",
+    "sha256": "227f76c55b6d2cecfb3f535620ec81fd2c1c0c0cf63367d70a748c3f2d9aafb0",
+    "manuscript_ms1": 84240,
+    "file_records": 85710,
+    "unique_names": 79262,
+    "duplicate_records": 6448,
+    "expansion": 14600646,
+    "expansion_by_chain_type": {
+      "two_variable_chains": 2589396,
+      "three_variable_chains": 12009064,
+      "single": 2185,
+      "fixed_named": 1
+    },
+    "unique_parents_by_type": {
+      "two_variable_chains": 73110,
+      "three_variable_chains": 3960,
+      "single": 2191
+    },
+    "templates_by_type": {
+      "two_variable_chains": 139,
+      "three_variable_chains": 4,
+      "single": 21
+    },
+    "lcb_c": [
+      12,
+      30
+    ],
+    "lcb_db": [
+      0,
+      5
+    ],
+    "fa_c": [
+      2,
+      42
+    ],
+    "fa_db": [
+      0,
+      3
+    ],
+    "chemically_filtered": false
+  },
+  "LDA2": {
+    "unique_species_candidates": 238,
+    "per_file": {
+      "LDA2_negative_noSphingoOH.xlsx": 238,
+      "LDA2_positive_noSphingoOH.xlsx": 238
+    },
+    "scope": "Official recommended example mass lists; not software capacity"
+  },
+  "MS-DIAL": {
+    "unique_candidates": 223338,
+    "per_file": {
+      "MSDIAL-TandemMassSpectralAtlas-VS69-Neg.msp": {
+        "records": 606599,
+        "unique_candidates": 205521
+      },
+      "MSDIAL-TandemMassSpectralAtlas-VS69-Pos.msp": {
+        "records": 128551,
+        "unique_candidates": 116079
+      }
+    },
+    "included_class_records": {
+      "Cer_EBDS": 43218,
+      "AHexCer": 32400,
+      "ASM": 31248,
+      "Cer_ADS": 3519,
+      "Cer_AP": 28704,
+      "Cer_AS": 10557,
+      "Cer_BDS": 3519,
+      "Cer_BS": 10557,
+      "Cer_EODS": 87975,
+      "Cer_EOS": 91154,
+      "Cer_NDS": 21452,
+      "Cer_NP": 10557,
+      "Cer_NS": 57436,
+      "CerP": 336,
+      "GM3": 2530,
+      "HexCer_AP": 28704,
+      "HexCer_EOS": 12409,
+      "HexCer_NDS": 21452,
+      "HexCer_NS": 57436,
+      "HexCer_HDS": 1470,
+      "HexCer_HS": 4410,
+      "Hex2Cer": 40944,
+      "Hex3Cer": 40944,
+      "PE_Cer": 5336,
+      "PI_Cer": 2196,
+      "SHexCer": 7048,
+      "SM": 60104,
+      "SL": 17484,
+      "PhytoSph": 17,
+      "DHSph": 17,
+      "Sph": 17
+    },
+    "version": "VS69"
+  },
+  "LipidIN": {
+    "unique_candidates": 618422,
+    "per_file": {
+      "pos": 548970,
+      "neg": 488852
+    },
+    "publication_SP_hierarchical_records": 6252820,
+    "version": "Local LipidIN-main.zip pos_ALL.rda + neg_ALL.rda",
+    "polarity_overlap": 419400
+  },
+  "LipiDetective": {
+    "unique_candidates": null,
+    "scope": "Not applicable: sequence prediction model"
+  }
+}
