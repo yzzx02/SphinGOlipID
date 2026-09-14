@@ -15,6 +15,7 @@ import pandas as pd
 from pyteomics import mzml
 
 from . import ms2_legacy_core as core
+from .config import TARGETED_FRAGMENT_PPM
 from .io_utils import ensure_output_dir, read_ms1_library
 from .logging_utils import attach_file_handler, configure_logging, get_logger
 from .rt_validation import add_series_columns, fit_ransac_models, predict_rt
@@ -30,7 +31,7 @@ class TargetedMzMLConfig:
     output_dir: Path
     targetlist_dir: Path | None = None
     mzml_dir: Path | None = None
-    fragment_ppm: float = 10.0
+    fragment_ppm: float = TARGETED_FRAGMENT_PPM
     min_fragment_intensity: float = 20.0
     min_matched_fragments: int = 2
     min_match_score: float = 0.35
@@ -98,6 +99,7 @@ def run_targeted_mzml_batch(
     logger = logger or get_logger("sphingolipid_toolkit.targeted_mzml")
     output_dir = ensure_output_dir(config.output_dir)
     attach_file_handler(output_dir / config.log_file_name, logger=logger)
+    logger.info("Effective fragment_ppm=%s (targeted mzML workflow config)", config.fragment_ppm)
 
     logger.info("Building combined MS1 feature table from targetlists")
     targetlist_raw = read_targetlist_directory(config.targetlist_dir)
@@ -339,6 +341,7 @@ def annotate_one_spectrum(
 
     logger = logger or get_logger("sphingolipid_toolkit.targeted_mzml")
     feature_id = str(feature["feature_id"])
+    logger.debug("Effective fragment_ppm=%s for scan %s", config.fragment_ppm, spectrum.scan_id)
     candidates = search_ms1_candidates(
         library,
         observed_mz=float(feature["feature_mz"]),
@@ -772,7 +775,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--mzml-dir", type=Path, default=None, help="Folder containing mzML files. Defaults to --data-dir.")
     parser.add_argument("--ms1-db", required=True, type=Path, help="MS1 theoretical library Excel/CSV file.")
     parser.add_argument("--output-dir", required=True, type=Path, help="Output folder.")
-    parser.add_argument("--fragment-ppm", type=float, default=10.0, help="MS2 fragment matching tolerance in ppm. Default: 10.")
+    parser.add_argument("--fragment-ppm", type=float, default=TARGETED_FRAGMENT_PPM, help=f"MS2 fragment matching tolerance in ppm. Default: {TARGETED_FRAGMENT_PPM:g}.")
     parser.add_argument("--ms1-ppm", type=float, default=10.0, help="MS1 library candidate tolerance in ppm. Default: 10.")
     parser.add_argument("--feature-ppm", type=float, default=10.0, help="mzML precursor to targetlist feature tolerance in ppm. Default: 10.")
     parser.add_argument("--min-intensity", type=float, default=20.0)

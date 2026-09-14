@@ -13,7 +13,7 @@ from typing import List, Sequence, Tuple
 import pandas as pd
 
 from . import ms2_legacy_core as core
-from .config import SphinGOlipIDConfig
+from .config import LEGACY_FRAGMENT_PPM, SphinGOlipIDConfig
 from .io_utils import (
     read_ms2_spectra_text,
     validate_ms2_file_inputs,
@@ -43,7 +43,7 @@ class MS2PipelineConfig:
     log_file_name: str = "run_log.txt"
     intermediate_dir_name: str = "intermediate"
     encoding: str = "GBK"
-    fragment_ppm: float = 20.0
+    fragment_ppm: float = LEGACY_FRAGMENT_PPM
     min_fragment_intensity: float = 20.0
     min_matched_fragments: int = 2
     min_match_score: float = 0.35
@@ -212,6 +212,7 @@ def run_one_file(config: ConfigLike, file_index: int, logger: logging.Logger | N
 
     config = _coerce_config(config)
     logger = logger or get_logger("sphingolipid_toolkit.ms2")
+    logger.info("Effective fragment_ppm=%s (legacy text workflow config)", config.fragment_ppm)
     input_dir = Path(config.input_dir)
     precursor_dir = Path(config.precursor_dir or config.input_dir)
     output_dir = Path(config.output_dir)

@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from .rt_validation import add_series_columns
@@ -45,7 +46,10 @@ def deduplicate_by_rt_score_intensity(
 
     For rows within ``rt_tolerance`` minutes, keep the row with the higher
     matching score; if scores tie, keep the higher total fragment intensity.
-    This mirrors the notebook's nested-loop duplicate-removal logic.
+    Select greedily in descending score/intensity order, then ascending RT.
+    Compare every candidate with *all retained* RTs in its group. Exact ties
+    use serialized row content (never the input index) for reproducibility.
+    Missing RTs cannot establish proximity and are retained independently.
     """
 
     required = set(group_cols) | {rt_col, score_col, intensity_col}
@@ -53,27 +57,36 @@ def deduplicate_by_rt_score_intensity(
     if missing:
         raise KeyError(f"Missing required column(s): {sorted(missing)}")
 
-    work = data.sort_values(by=rt_col).reset_index(drop=True)
+    if rt_tolerance < 0:
+        raise ValueError("rt_tolerance must be non-negative")
+    work = data.reset_index(drop=True)
     kept_groups: list[pd.DataFrame] = []
 
-    for _, group in work.groupby(list(group_cols), group_keys=False, sort=False):
-        group = group.sort_values(by=rt_col).reset_index(drop=True)
+    for _, group in work.groupby(list(group_cols), group_keys=False, sort=True):
+        # A separate ordering table avoids changing input columns or dtypes.
+        ordering = pd.DataFrame({
+            "score": pd.to_numeric(group[score_col]),
+            "intensity": pd.to_numeric(group[intensity_col]),
+            "rt": pd.to_numeric(group[rt_col]),
+            "tie": group.apply(
+                lambda row: repr(tuple(
+                    value.tolist() if isinstance(value, np.ndarray) else value
+                    for value in row
+                )), axis=1,
+            ),
+        }).sort_values(
+            ["score", "intensity", "rt", "tie"],
+            ascending=[False, False, True, True], kind="stable", na_position="last",
+        )
         keep_indices: list[int] = []
-        for i in range(len(group)):
-            keep = True
-            for j in range(i + 1, len(group)):
-                rt_diff = abs(float(group.iloc[i][rt_col]) - float(group.iloc[j][rt_col]))
-                if rt_diff <= rt_tolerance:
-                    score_i = group.iloc[i][score_col]
-                    score_j = group.iloc[j][score_col]
-                    intensity_i = group.iloc[i][intensity_col]
-                    intensity_j = group.iloc[j][intensity_col]
-                    if score_i < score_j or (score_i == score_j and intensity_i < intensity_j):
-                        keep = False
-                        break
-            if keep:
+        kept_rts: list[float] = []
+        for i, candidate in ordering.iterrows():
+            rt = candidate["rt"]
+            if pd.isna(rt) or not any(abs(rt - kept) <= rt_tolerance for kept in kept_rts):
                 keep_indices.append(i)
-        kept_groups.append(group.iloc[keep_indices])
+                if pd.notna(rt):
+                    kept_rts.append(float(rt))
+        kept_groups.append(group.loc[keep_indices])
 
     return pd.concat(kept_groups, ignore_index=True) if kept_groups else pd.DataFrame(columns=data.columns)
 

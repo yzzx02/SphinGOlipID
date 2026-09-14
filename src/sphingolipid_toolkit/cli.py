@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .config import SphinGOlipIDConfig
+from .config import LEGACY_FRAGMENT_PPM, SphinGOlipIDConfig
 from .logging_utils import configure_logging
 from .ms2_pipeline import parse_file_indices, run_batch
 
@@ -30,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ms1-db", required=True, type=Path, help="MS1 theoretical database Excel file, e.g. MS1 DB_new 3.0.xlsx.")
     parser.add_argument("--files", default="1-6", help="File indices to process, e.g. 1-6 or 1,3,5.")
     parser.add_argument("--encoding", default="GBK", help="Encoding of exported MS/MS txt files. Default: GBK.")
-    parser.add_argument("--fragment-ppm", type=float, default=20.0, help="Fragment m/z tolerance in ppm. Default: 20.")
+    parser.add_argument("--fragment-ppm", type=float, default=LEGACY_FRAGMENT_PPM, help=f"Fragment m/z tolerance in ppm. Default: {LEGACY_FRAGMENT_PPM:g}.")
     parser.add_argument("--min-intensity", type=float, default=20.0, help="Measured fragment intensity cutoff. Default: 20.")
     parser.add_argument("--min-fragments", type=int, default=2, help="Minimum number of matched fragments. Default: 2.")
     parser.add_argument("--min-score", type=float, default=0.35, help="Minimum MS2 match score. Default: 0.35.")

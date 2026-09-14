@@ -347,6 +347,22 @@ def iterative_refit(
     return final_model, active
 
 
+def _with_fit_provenance(record: dict[str, object]) -> dict[str, object]:
+    """Add summary aliases only; Chinese scientific fields remain authoritative.
+
+    IUP can subsequently shift the intercept; its existing IUP offset/original
+    parameter fields describe that validation step, not a second fit strategy.
+    """
+    record["fit_strategy"] = "RANSAC-seeded OLS refit"
+    for english, legacy in {
+        "fit_type": "拟合类型", "r2": "R²",
+        "representative_point_count": "代表点数", "inlier_count": "内点数",
+        "x_min": "x最小", "x_max": "x最大",
+    }.items():
+        record[english] = record.get(legacy)
+    return record
+
+
 def _fit_candidate_model(points: pd.DataFrame, fit_type: str, config: RTIUPConfig) -> dict[str, object] | None:
     result = iterative_refit(points, fit_type, config)
     if result is None:
@@ -366,7 +382,7 @@ def _fit_candidate_model(points: pd.DataFrame, fit_type: str, config: RTIUPConfi
     if fit_type == "Quadratic" and _has_clear_decreasing_tail(inlier_points, config):
         return None
 
-    return {
+    return _with_fit_provenance({
         "拟合类型": fit_type,
         "参数": params,
         "R²": r2,
@@ -374,11 +390,11 @@ def _fit_candidate_model(points: pd.DataFrame, fit_type: str, config: RTIUPConfi
         "内点数": int(len(inlier_points)),
         "x最小": x_min,
         "x最大": x_max,
-    }
+    })
 
 
 def fit_line(group: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> dict[str, object]:
-    """Fit one unsaturation curve using linear/quadratic RANSAC candidates."""
+    """Compare linear/quadratic RANSAC-seeded OLS refits on inlier medians."""
 
     plot_group = str(group["细类"].iloc[0])
     line_unsat = float(group["曲线不饱和度"].iloc[0])
@@ -409,7 +425,7 @@ def fit_line(group: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> dict[s
     }
     if len(fit_points) < 3:
         base["失败原因"] = "少于3个点"
-        return base
+        return _with_fit_provenance(base)
 
     linear_fit = _fit_candidate_model(fit_points, "Linear", config)
     quadratic_fit = None
@@ -417,7 +433,7 @@ def fit_line(group: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> dict[s
         quadratic_fit = _fit_candidate_model(fit_points, "Quadratic", config)
     if linear_fit is None and quadratic_fit is None:
         base["失败原因"] = "未达到R²或单调ECN要求"
-        return base
+        return _with_fit_provenance(base)
     if linear_fit is None:
         best = quadratic_fit
     elif quadratic_fit is None:
@@ -431,7 +447,7 @@ def fit_line(group: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> dict[s
     best["不同碳数"] = int(len(fit_points))
     base.update(best)
     base["拟合成功"] = True
-    return base
+    return _with_fit_provenance(base)
 
 
 def derivative_values(line: pd.Series, x: np.ndarray | float) -> np.ndarray:
