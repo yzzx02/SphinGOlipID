@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sphingolipid-toolkit"
 version = "0.3.0"
-description = "Project scaffold for SphinGOlipID sphingolipid MS/MS annotation workflow"
+description = "SphinGOlipID toolkit for sphingolipid MS/MS annotation and retention-time validation"
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.23",
