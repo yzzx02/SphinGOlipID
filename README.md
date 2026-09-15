@@ -339,3 +339,20 @@ are undefined and rejected. CSV can supply `glycan_encoding` and optional
 See [the scientific logic report](docs/SCIENTIFIC_LOGIC_UPDATE_REPORT.md) for
 syntax scope, production integration, synthetic comparisons and verification.
 Historical identification and RT outputs have not been regenerated.
+
+## Multi-evidence annotation and scoring
+
+An opt-in evidence adapter adds `Precursor / HG / LCB / NL / common` metadata,
+class-specific gates and the three author-specified scoring templates alongside
+legacy scores. Each required evidence group must independently match at least
+50% of its eligible theoretical fragments. Cer mono/didehydration is diagnostic
+NL under the author's explicit Cer-only policy; other common evidence cannot
+satisfy a structural gate.
+
+Intensity uses the complete spectrum's base peak before `I / (I + k)` scoring.
+One-to-one matching remains unchanged. Batch outputs and archived results are
+not automatically rescored. See [the scoring specification](docs/MULTI_EVIDENCE_SCORING.md)
+and [implementation report](docs/MULTI_EVIDENCE_IMPLEMENTATION_REPORT.md), including
+unresolved single-chain templates and glycan representative-fragment validation.
+
+Synthetic comparison only: `python scripts/multi_evidence_shadow.py`.
