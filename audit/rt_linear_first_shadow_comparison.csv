@@ -1,0 +1,4 @@
+scope,series,old_model,new_model,old_r2,new_r2,old_valid,new_valid
+synthetic_only,curvature_0.0,Linear,Linear,1.0,1.0,True,True
+synthetic_only,curvature_0.004,Linear,Linear,0.9994403134244823,0.9994403134244823,True,True
+synthetic_only,curvature_0.01,Quadratic,Linear,1.0,0.996512207274539,True,True

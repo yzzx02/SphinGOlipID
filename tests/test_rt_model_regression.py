@@ -43,7 +43,7 @@ def test_replicates_are_medians_not_independent_fit_points():
     assert model.coef_[0] == pytest.approx(.4)
 
 
-@pytest.mark.parametrize("curvature,expected", [(0.,"Linear"),(.004,"Linear"),(.01,"Quadratic")])
+@pytest.mark.parametrize("curvature,expected", [(0.,"Linear"),(.004,"Linear"),(.01,"Linear")])
 def test_linear_quadratic_selection_with_real_synthetic_fits(curvature, expected):
     x = np.array([16.,18.,20.,22.,24.])
     data = points(x,.4*x + curvature*(x-20)**2)
@@ -51,8 +51,6 @@ def test_linear_quadratic_selection_with_real_synthetic_fits(curvature, expected
     linear = rt._fit_candidate_model(data,"Linear",config)
     quadratic = rt._fit_candidate_model(data,"Quadratic",config)
     assert linear is not None and quadratic is not None
-    gain = quadratic["R²"]-linear["R²"]
-    assert (gain >= .002) == (expected == "Quadratic")
     line = rt.fit_line(data)
     assert line["拟合类型"] == expected
     assert line["拟合成功"]
@@ -64,14 +62,22 @@ def test_quadratic_requires_four_distinct_carbons_not_four_rows():
     assert rt.fit_line(data)["拟合类型"] == "Linear"
 
 
-@pytest.mark.parametrize("linear_r2,expected", [(.9980001,"Linear"),(.998,"Quadratic")])
-def test_model_selection_gain_boundary(monkeypatch,linear_r2,expected):
-    # Isolate the decision boundary from numerical fitting noise. Real model
-    # construction and validation are exercised in the tests above.
+@pytest.mark.parametrize("linear_valid,quadratic_valid,expected", [
+    (True,True,"Linear"),(True,False,"Linear"),
+    (False,True,"Quadratic"),(False,False,None)])
+def test_linear_first_and_fallback(monkeypatch,linear_valid,quadratic_valid,expected):
+    calls = []
     def candidate(data,fit_type,config):
-        return {"拟合类型":fit_type,"R²":linear_r2 if fit_type == "Linear" else 1.}
+        calls.append(fit_type)
+        valid = linear_valid if fit_type == "Linear" else quadratic_valid
+        return {"拟合类型":fit_type,"R²":.99 if fit_type == "Linear" else 1.} if valid else None
     monkeypatch.setattr(rt,"_fit_candidate_model",candidate)
-    assert rt.fit_line(points([16,18,20,22],[6.4,7.2,8.,8.8]))["拟合类型"] == expected
+    result = rt.fit_line(points([16,18,20,22],[6.4,7.2,8.,8.8]))
+    if expected:
+        assert result["拟合类型"] == expected
+    else:
+        assert not result["拟合成功"]
+    assert calls == (["Linear"] if linear_valid else ["Linear","Quadratic"])
 
 
 @pytest.mark.parametrize("fit_type", ["Linear","Quadratic"])
@@ -88,9 +94,24 @@ def test_decreasing_rt_is_rejected_despite_perfect_r2():
     assert not line["拟合成功"]
 
 
+def test_real_quadratic_fallback_after_linear_failure():
+    x = np.array([16.,18.,20.,22.])
+    data = points(x,.1*(x-15)**2)
+    assert rt._fit_candidate_model(data,"Linear",rt.RTIUPConfig()) is None
+    assert rt.fit_line(data)["拟合类型"] == "Quadratic"
+
+
+def test_equally_complete_iup_sets_prefer_linear_over_r2_and_support():
+    linear = pd.Series({"拟合类型":"Linear","内点数":4,"R²":.99})
+    quadratic = pd.Series({"拟合类型":"Quadratic","内点数":8,"R²":1.})
+    assert rt._iup_candidate_set_score([linear],[0.],rt.RTIUPConfig()) > rt._iup_candidate_set_score(
+        [quadratic],[0.],rt.RTIUPConfig())
+
+
 def test_defaults_and_summary_aliases_preserve_chinese_fields():
     config = rt.RTIUPConfig()
-    assert (config.r2_threshold,config.rt_window_min,config.quadratic_min_distinct_x,config.quadratic_min_r2_gain) == (.99,.2,4,.002)
+    assert (config.r2_threshold,config.rt_window_min,config.quadratic_min_distinct_x) == (.99,.2,4)
+    assert not hasattr(config,"quadratic_min_r2_gain")
     data = points([16.,18.,20.,22.],[6.4,7.2,8.,8.8])
     summaries = [rt.fit_line(data),rt.fit_line(data.iloc[:2])]
     summaries.extend(rt.fit_ecn(data).lines.to_dict("records"))
@@ -104,15 +125,12 @@ def test_defaults_and_summary_aliases_preserve_chinese_fields():
             assert line[alias] == line[original]
 
 
-def test_existing_iup_rescue_ranking_is_not_the_fit_line_gain_rule(monkeypatch):
-    """Known scope gap: rescue compares parallelism, then R2, not a 0.002 gate.
-
-    Do not silently change this existing RT selection path while adding aliases.
-    """
+@pytest.mark.parametrize("linear_allowed", [True,False])
+def test_iup_rescue_prefers_valid_linear(monkeypatch,linear_allowed):
     data = points([16,18,20,22],[6.4,7.2,8.,8.8])
     monkeypatch.setattr(rt,"pick_rescue_points",lambda *args:data)
     monkeypatch.setattr(rt,"is_near_horizontal",lambda *args:False)
-    monkeypatch.setattr(rt,"line_between_bracket",lambda *args:True)
+    monkeypatch.setattr(rt,"line_between_bracket",lambda line,*args: linear_allowed or line["拟合类型"] == "Quadratic")
     monkeypatch.setattr(rt,"pair_parallel_status",lambda *args:(True,{"斜率相对差":0.}))
     def candidate(points,fit_type,config):
         return {"拟合类型":fit_type,"R²":.999 if fit_type == "Linear" else .9995,
@@ -120,4 +138,4 @@ def test_existing_iup_rescue_ranking_is_not_the_fit_line_gain_rule(monkeypatch):
                 "内点数":4,"代表点数":4,"x最小":16.,"x最大":22.}
     monkeypatch.setattr(rt,"_fit_rescue_candidate",candidate)
     result = rt.build_rescue_line("synthetic",1.,data,pd.Series({"不饱和度":0.}),pd.Series({"不饱和度":2.}))
-    assert result["拟合类型"] == "Quadratic"
+    assert result["拟合类型"] == ("Linear" if linear_allowed else "Quadratic")

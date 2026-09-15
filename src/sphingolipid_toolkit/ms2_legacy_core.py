@@ -15,6 +15,9 @@ from time import time
 import numpy as np
 import pandas as pd
 
+from .fragment_assignment import select_one_to_one_edges
+from .glycan_encoding import parse_glycan_encoding, generate_glycan_losses
+
 # Runtime variables set by ms2_pipeline.py before each run.
 folder = "./"
 ms2_data = "actual_ms2.xlsx"
@@ -90,6 +93,17 @@ def GSL_fragments(input_str, location, M, name):
     glycan = {'-Fuc': 146.0579, '-Gal': 162.0528, '-Glc': 162.0528, '-Hex': 162.0528, '-GalNAc': 203.08,
               '-GlcNAc': 203.08, '': 0,
               '-KDN': 250.07, '-NeuGc': 307.09, '-NeuAc': 291.09}
+
+    encoding = parse_glycan_encoding(input_str, location)
+    if encoding.source_format == 'residue_sequence':
+        fragments = generate_glycan_losses(encoding, M, name, glycan)
+        all_residues = encoding.main_chain + tuple(r for b in encoding.branches for r in b.residues)
+        if 'NeuAc' in all_residues:
+            fragments.extend([('NeuAc+H', 292.10), ('NeuAc+H-H2O', 274.09)])
+        for label, mz in fragments:
+            frag_id1.append(label)
+            frag_mz1.append(mz)
+        return
 
     list = input_str.split(" ")
     sumvalues = 0
@@ -486,14 +500,20 @@ def process_sheet(sheet_name, dfa, dfb):
     attr_cols = dfs2.columns.tolist()
     data_array = dfs1[['idx', 'A', 'B']].to_numpy()
     results = []
-    for row in data_array:
+    observed_ids = []
+    for observed_id, row in enumerate(data_array):
         result = query(row, attr_array, attr_cols)
         if result is not None:
             results.append(result)
+            observed_ids.extend([observed_id] * len(result))
     if results:
         results_array = np.vstack(results)
         df_results = pd.DataFrame(results_array, columns=attr_cols + ['index', 'A', 'B'])
-        df_results = df_results.drop_duplicates()
+        df_results['_observed_id'] = observed_ids
+        df_results = select_one_to_one_edges(
+            df_results, observed_cols=['_observed_id'], observed_mz_col='A',
+            intensity_col='B', theoretical_mz_col='mz', candidate_cols=['anno'], label_col='idf',
+        ).drop(columns=['_observed_id'])
         df_results.to_csv(f'{folder}out-query.csv', index=False, mode='a', header=False, encoding='utf-8')
 
 

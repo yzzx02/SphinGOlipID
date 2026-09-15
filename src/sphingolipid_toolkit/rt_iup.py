@@ -64,7 +64,6 @@ class RTIUPConfig:
     short_series_max_crossed_unsats: int = 1
     max_refit_iterations: int = 5
     quadratic_min_distinct_x: int = 4
-    quadratic_min_r2_gain: float = 0.002
     parallel_min_overlap_x: float = 2.0
     parallel_abs_slope_tolerance: float = 0.10
     parallel_relative_slope_tolerance: float = 0.25
@@ -394,7 +393,7 @@ def _fit_candidate_model(points: pd.DataFrame, fit_type: str, config: RTIUPConfi
 
 
 def fit_line(group: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> dict[str, object]:
-    """Compare linear/quadratic RANSAC-seeded OLS refits on inlier medians."""
+    """Linear-first RANSAC-seeded OLS; evaluate quadratic only if linear fails."""
 
     plot_group = str(group["细类"].iloc[0])
     line_unsat = float(group["曲线不饱和度"].iloc[0])
@@ -427,22 +426,12 @@ def fit_line(group: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> dict[s
         base["失败原因"] = "少于3个点"
         return _with_fit_provenance(base)
 
-    linear_fit = _fit_candidate_model(fit_points, "Linear", config)
-    quadratic_fit = None
-    if len(fit_points) >= config.quadratic_min_distinct_x:
-        quadratic_fit = _fit_candidate_model(fit_points, "Quadratic", config)
-    if linear_fit is None and quadratic_fit is None:
+    best = _fit_candidate_model(fit_points, "Linear", config)
+    if best is None and len(fit_points) >= config.quadratic_min_distinct_x:
+        best = _fit_candidate_model(fit_points, "Quadratic", config)
+    if best is None:
         base["失败原因"] = "未达到R²或单调ECN要求"
         return _with_fit_provenance(base)
-    if linear_fit is None:
-        best = quadratic_fit
-    elif quadratic_fit is None:
-        best = linear_fit
-    elif float(quadratic_fit["R²"]) - float(linear_fit["R²"]) < config.quadratic_min_r2_gain:
-        best = linear_fit
-    else:
-        best = quadratic_fit
-    assert best is not None
     best["点数"] = int(len(raw_points))
     best["不同碳数"] = int(len(fit_points))
     base.update(best)
@@ -821,12 +810,12 @@ def generate_iup_line_candidates(
             if candidate is not None:
                 append_candidate(candidate, "多起点原始候选RANSAC", True)
 
-    def rank(record: pd.Series) -> tuple[int, float, int]:
+    def rank(record: pd.Series) -> tuple[int, int, float]:
         linear_bonus = 1 if record.get("拟合类型") == "Linear" else 0
         return (
+            linear_bonus,
             int(finite(record.get("内点数")) or 0),
             float(finite(record.get("R²")) or 0.0),
-            linear_bonus,
         )
 
     records.sort(key=rank, reverse=True)
@@ -930,11 +919,13 @@ def _iup_candidate_set_score(
         parallel_penalty += relative if relative is not None else 2.0
     return (
         float(len(lines)),
+        # Among equally complete feasible IUP sets, prefer simpler models
+        # before support/R2. An infeasible linear set is never preferred.
+        float(sum(line.get("拟合类型") == "Linear" for line in lines)),
         float(sum(int(finite(line.get("内点数")) or 0) for line in lines)),
         float(parallel_passes),
         -parallel_penalty,
         float(sum(finite(line.get("R²")) or 0.0 for line in lines)),
-        float(sum(line.get("拟合类型") == "Linear" for line in lines)),
         -float(sum(abs(value) for value in shifts)),
     )
 
@@ -1496,32 +1487,13 @@ def build_rescue_line(
         if not line_between_bracket(line, lower_line, higher_line, config):
             continue
         candidates.append(line.to_dict())
+        # Linear has passed the same physical/bracketing rescue constraints.
+        # Do not fit or rank a more complex explanation for this point set.
+        break
     if not candidates:
         return None
 
-    def score(item: dict[str, object]) -> tuple[int, float, float, int, int]:
-        candidate_line = pd.Series(item)
-        parallel_results = [
-            pair_parallel_status(lower_line, candidate_line, config)[0],
-            pair_parallel_status(candidate_line, higher_line, config)[0],
-        ]
-        parallel_passes = sum(result is True for result in parallel_results)
-        slope_penalty = 0.0
-        for left, right in ((lower_line, candidate_line), (candidate_line, higher_line)):
-            _, detail = pair_parallel_status(left, right, config)
-            relative = finite(detail.get("斜率相对差"))
-            if relative is not None:
-                slope_penalty += relative
-        complexity_bonus = 0 if item["拟合类型"] == "Linear" else -1
-        return (
-            parallel_passes,
-            -slope_penalty,
-            float(item["R²"]),
-            int(item["内点数"]),
-            complexity_bonus,
-        )
-
-    best = sorted(candidates, key=score, reverse=True)[0]
+    best = candidates[0]
     lower_unsat = finite(lower_line.get("不饱和度"))
     higher_unsat = finite(higher_line.get("不饱和度"))
     best.update(

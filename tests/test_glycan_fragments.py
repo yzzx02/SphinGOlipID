@@ -80,6 +80,6 @@ def test_hash_branch_syntax_is_not_supported_by_legacy():
         core.GSL_fragments("-Gal #-NeuAc -Glc","",1500.,"synthetic")
 
 
-def test_csv_name_fallback_lacks_branch_metadata_gap_is_explicit():
-    assert _derive_legacy_structure("GM1(d34:1)") == "-Gal -GalNAc -NeuAc -Gal -Glc"
+def test_csv_gm1_fallback_preserves_known_topology():
+    assert _derive_legacy_structure("GM1(d34:1)") == "Gal-GalNAc-Gal(-NeuAc)-Glc"
     assert _derive_legacy_classy("GM1(d34:1)") == ""

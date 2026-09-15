@@ -220,8 +220,10 @@ validation modes:
 - IUP searches the original candidates independently within the locked
   `0.20 min` RT window and `0.05 min` IUP allowance. Parallelism and ordering
   guide candidate selection but do not silently relax either threshold.
-- Linear models are preferred unless a quadratic model has at least four
-  distinct carbon numbers and improves R² by at least `0.002`.
+- Linear-first: accept a valid Linear model immediately. Evaluate Quadratic
+  only when Linear fails; Quadratic requires at least four distinct carbon
+  numbers, R² ≥ 0.99 and a physically plausible positive trend. Rescue also
+  prefers Linear when it satisfies the applicable constraints.
 - Plot legends report only the unsaturation and fitted R².
 
 ## Six-fraction supplementary information
@@ -321,3 +323,19 @@ sphingolipid-targeted-mzml \
 ```
 
 See `docs/TARGETED_MZML_WORKFLOW.md`.
+
+## Scientific logic correction
+
+Production MS/MS matching now uses deterministic one-to-one centroid assignment:
+maximum pair count, minimum total absolute ppm error, then observed intensity.
+Identical theoretical masses retain alternative labels but score once.
+
+The final-manuscript glycan syntax is `Gal-Gal(-Fuc)-GlcNAc-Gal-Glc`:
+`(-Fuc)` attaches to the preceding Gal. Historical space-separated residues with
+integer branch positions remain supported. `#`, nested or multi-residue branches
+are undefined and rejected. CSV can supply `glycan_encoding` and optional
+`branch_positions` (or legacy `structure` and `classy`) explicitly.
+
+See [the scientific logic report](docs/SCIENTIFIC_LOGIC_UPDATE_REPORT.md) for
+syntax scope, production integration, synthetic comparisons and verification.
+Historical identification and RT outputs have not been regenerated.

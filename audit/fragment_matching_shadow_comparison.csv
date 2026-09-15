@@ -1,0 +1,5 @@
+scope,baseline_commit,scenario,precursor,candidate,old_count,old_matched_intensity,old_score,old_rank,old_top1,new_count,new_matched_intensity,new_score,new_rank,new_top1
+synthetic_only,4ceeae448bee9851c69ead63d323d7f5a8eb50a9,one_observed_two_theories,500.0,A,2,100.0,100.0,1,True,1,50.0,50.0,2,False
+synthetic_only,4ceeae448bee9851c69ead63d323d7f5a8eb50a9,one_observed_two_theories,500.0,B,1,40.0,90.0,2,False,1,40.0,90.0,1,True
+synthetic_only,4ceeae448bee9851c69ead63d323d7f5a8eb50a9,two_observed_two_theories,500.0,A,2,160.0,100.0,1,True,2,130.0,100.0,1,True
+synthetic_only,4ceeae448bee9851c69ead63d323d7f5a8eb50a9,identical_labels,500.0,A,1,50.0,100.0,1,True,1,50.0,100.0,1,True

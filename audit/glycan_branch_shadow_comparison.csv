@@ -1,0 +1,35 @@
+scope,candidate,precursor,theoretical_mz,old_present,new_present,old_encoding,old_positions,new_encoding
+synthetic_only,GM1,1500.0,274.09,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,292.1,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,501.661,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,519.6716,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,663.7138,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,681.7244,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,825.7666,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,843.7772,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,1028.8466,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,1046.8572,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,1116.8566,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,1134.8672,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,1190.8994,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,1208.91,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,1319.9366,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,1337.9472,True,True, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,1481.9894,True,False, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,GM1,1500.0,1500.0,True,False, -Gal -GalNAc -NeuAc -Gal -Glc,"0,3",Gal-GalNAc-Gal(-NeuAc)-Glc
+synthetic_only,Figure4_type_I_B,1500.0,484.6403,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,502.6509,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,646.6931,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,664.7037,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,808.7459,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,826.7565,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,1011.8259,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,1029.8365,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,1173.8787,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,1191.8893,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,1319.9366,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,1335.9315,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,1337.9472,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,1353.9421,True,True, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,1481.9894,True,False, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc
+synthetic_only,Figure4_type_I_B,1500.0,1500.0,True,False, -Gal -Fuc -Gal -GlcNAc -Gal -Glc,"0,2",Gal-Gal(-Fuc)-GlcNAc-Gal-Glc

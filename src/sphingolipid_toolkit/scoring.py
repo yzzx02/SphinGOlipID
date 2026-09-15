@@ -10,6 +10,8 @@ from typing import Sequence
 import numpy as np
 import pandas as pd
 
+from .fragment_assignment import select_one_to_one_edges
+
 
 def ppm_error(observed_mz: float, theoretical_mz: float) -> float:
     """Return signed ppm error for an observed/theoretical m/z pair."""
@@ -29,12 +31,9 @@ def match_fragments(
 ) -> pd.DataFrame:
     """Match normalized observed and theoretical fragment tables.
 
-    Return matches with production finalization semantics: for each candidate
-    and theoretical m/z retain the highest-intensity observed centroid. One
-    observed peak CAN support multiple distinct theoretical m/z values; this
-    legacy one-to-many behavior is deliberately preserved, not a claim of
-    independent fragment evidence. The production pipeline does not call this
-    API. Supply candidate_col for custom identifiers; anno/lipid_name/candidate_id
+    Use the shared production one-to-one assignment: maximize pair count,
+    minimize total absolute ppm error, then prefer observed intensity.
+    Supply candidate_col for custom identifiers; anno/lipid_name/candidate_id
     are recognized automatically. With no identifier the table is one candidate.
     """
 
@@ -60,11 +59,9 @@ def match_fragments(
     theoretical = theoretical_fragments.copy()
     theoretical[theoretical_mz_col] = pd.to_numeric(theoretical[theoretical_mz_col], errors="coerce")
     theoretical = theoretical.dropna(subset=[theoretical_mz_col])
-    identity = ([candidate_col] if candidate_col else []) + [theoretical_mz_col]
-    theoretical = theoretical.drop_duplicates(identity)
 
     rows: list[dict[str, object]] = []
-    for _, obs in observed.iterrows():
+    for observed_id, (_, obs) in enumerate(observed.iterrows()):
         for _, theo in theoretical.iterrows():
             mz = float(theo[theoretical_mz_col])
             fraction = float(ppm_tolerance) / 1_000_000
@@ -78,6 +75,7 @@ def match_fragments(
                     "theoretical_mz": float(theo[theoretical_mz_col]),
                     "ppm_error": float(error),
                     "matched": True,
+                    "_observed_id": observed_id,
                 }
                 for col in ("fragment_name", "fragment_type", "fragment_formula", "evidence_level", "description"):
                     if col in theoretical.columns:
@@ -98,13 +96,17 @@ def match_fragments(
             "matched",
             "evidence_level",
             "description",
+            "_observed_id",
         ] + ([candidate_col] if candidate_col else []),
     ).dropna(axis=1, how="all")
     if result.empty:
         return result
-    identity = ([candidate_col] if candidate_col else []) + ["theoretical_mz"]
-    return (result.sort_values("observed_intensity", ascending=False, kind="stable")
-            .drop_duplicates(identity).reset_index(drop=True))
+    return select_one_to_one_edges(
+        result, observed_cols=["_observed_id"], observed_mz_col="observed_mz",
+        intensity_col="observed_intensity", theoretical_mz_col="theoretical_mz",
+        candidate_cols=[candidate_col] if candidate_col else [],
+        label_col="fragment_name" if "fragment_name" in result else None,
+    ).drop(columns=["_observed_id"])
 
 
 def score_fragment_matches(matches: pd.DataFrame, total_fragment_intensity: float | None = None) -> dict[str, float | int]:

@@ -49,14 +49,14 @@ def test_normalized_count_does_not_change_legacy_scores_or_rank_order(tmp_path):
     assert result["rank"].tolist() == [1,2]
 
 
-def test_api_reuses_observed_peak_but_counts_each_theoretical_mz_once():
+def test_api_assigns_each_observed_peak_once():
     observed = pd.DataFrame({"fragment_mz":[100.,100.00005],"fragment_intensity":[50.,80.]})
     theoretical = pd.DataFrame({"theoretical_mz":[100.0001,100.0002,100.0001]})
     matches = match_fragments(observed,theoretical,20)
     summary = score_fragment_matches(matches,total_fragment_intensity=130)
     assert summary["matched_fragment_count"] == 2
-    assert summary["matched_intensity_sum"] == 160.
-    assert matches.observed_mz.tolist() == [100.00005,100.00005]
+    assert summary["matched_intensity_sum"] == 130.
+    assert sorted(matches.observed_mz.tolist()) == [100.,100.00005]
 
 
 def test_api_keeps_candidate_identity_when_masses_are_shared():

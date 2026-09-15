@@ -1,3 +1,5 @@
+> Historical audit snapshot at `4ceeae4`. Matching, glycan parsing and RT selection descriptions below are superseded by [SCIENTIFIC_LOGIC_UPDATE_REPORT.md](SCIENTIFIC_LOGIC_UPDATE_REPORT.md); old thresholds are not current instructions.
+
 # 投稿前算法实现审计与锁定（2026-09-14）
 
 基线：GitHub `yzzx02/SphinGOlipID` 的 `main`，提交 `3e0b33f374c8f8e5abee7c983bbd74efd74045c8`。修正位于独立分支 `codex/algorithm-submission-lock`。本报告锁定已实现行为及已知限制，不宣称所有 manuscript claim 都已实现。

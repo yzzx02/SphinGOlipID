@@ -40,25 +40,25 @@ def run_matchers(tmp_path, monkeypatch, masses, intensities, theoretical, ppm=20
     return legacy,targeted,api
 
 
-def test_one_observed_peak_two_nearby_theories_is_legacy_one_to_many(tmp_path, monkeypatch):
+def test_one_observed_peak_two_nearby_theories_counts_once(tmp_path, monkeypatch):
     legacy,targeted,api = run_matchers(tmp_path,monkeypatch,[100.],[50.],theory([100.0001,100.0002]))
     for result in [legacy,targeted]:
-        assert result.matched_fragment_count.tolist() == [2]
-        assert result["实际mz"].iloc[0] == [100.,100.]
-        assert result["强度总和"].iloc[0] == 100.
-        assert result["匹配度分数"].iloc[0] == 1.
-    assert score_fragment_matches(api)["matched_fragment_count"] == 2
-    assert score_fragment_matches(api)["matched_intensity_sum"] == 100.
+        assert result.matched_fragment_count.tolist() == [1]
+        assert result["实际mz"].iloc[0] == [100.]
+        assert result["强度总和"].iloc[0] == 50.
+        assert result["匹配度分数"].iloc[0] == .5
+    assert score_fragment_matches(api)["matched_fragment_count"] == 1
+    assert score_fragment_matches(api)["matched_intensity_sum"] == 50.
 
 
-def test_multiple_observed_centroids_keep_highest_intensity_per_theory(tmp_path, monkeypatch):
+def test_multiple_observed_centroids_choose_ppm_before_intensity(tmp_path, monkeypatch):
     legacy,targeted,api = run_matchers(tmp_path,monkeypatch,[100.,100.0005],[50.,80.],theory([100.0001]))
     for result in [legacy,targeted]:
         assert result.matched_fragment_count.tolist() == [1]
-        assert result["强度总和"].iloc[0] == 80.
-        assert result["实际mz"].iloc[0] == [100.0005]
+        assert result["强度总和"].iloc[0] == 50.
+        assert result["实际mz"].iloc[0] == [100.]
     assert score_fragment_matches(api)["matched_fragment_count"] == 1
-    assert score_fragment_matches(api)["matched_intensity_sum"] == 80.
+    assert score_fragment_matches(api)["matched_intensity_sum"] == 50.
 
 
 def test_identical_theory_masses_are_counted_once(tmp_path, monkeypatch):
@@ -96,3 +96,20 @@ def test_inclusive_ppm_endpoints_use_production_arithmetic(tmp_path,monkeypatch,
     legacy,targeted,api = run_matchers(tmp_path,monkeypatch,[observed],[50.],theoretical)
     assert legacy.matched_fragment_count.tolist() == targeted.matched_fragment_count.tolist() == [1]
     assert len(api) == 1
+
+
+def test_maximum_cardinality_requires_reassigning_nearest_peak(tmp_path,monkeypatch):
+    # Peak 100 matches only theory 100; peak 100.0009 also matches 100.0018.
+    legacy,targeted,api = run_matchers(tmp_path,monkeypatch,
+        [100.,100.0009],[50.,80.],theory([100.,100.0018]),ppm=10)
+    assert legacy.matched_fragment_count.tolist() == targeted.matched_fragment_count.tolist() == [2]
+    assert len(api) == 2
+    assert api.observed_mz.nunique() == 2
+
+
+@pytest.mark.parametrize("seed", [0,1,2])
+def test_tied_candidate_top_n_is_deterministic(tmp_path,monkeypatch,seed):
+    theoretical = pd.concat([theory([100.],name) for name in ["C","B","A"]],ignore_index=True)
+    legacy,targeted,_ = run_matchers(tmp_path,monkeypatch,[100.],[50.],
+        theoretical.sample(frac=1,random_state=seed),top_n=2)
+    assert legacy["注释"].tolist() == targeted["注释"].tolist() == ["A","B"]
