@@ -1,4 +1,3 @@
-from dataclasses import replace
 import pandas as pd
 import pytest
 
@@ -20,12 +19,12 @@ def evaluate(theory=None, masses=(100.,200.,210.,300.,400.), intensities=(100.,5
         PrecursorEvidence(True,0.,"[M+H]+"),total_composition="SM(d34:1)",**kwargs)
 
 
-def test_denominator_includes_unmatched_eligible_theory():
+def test_structural_quality_is_max_while_gate_keeps_unmatched_theory():
     result = evaluate()
-    assert result.summary["N_LCB"] == 3
-    assert result.summary["S_LCB"] == pytest.approx((.5/(.5+.1)*2)/3)
-    assert result.summary["S_HG"] == pytest.approx(1/1.1)
-    expected = 60/1.1 + 20*(.5/.6*2/3) + 15*(.25/.35) + 5*(.1/.15)
+    assert result.summary["secondary_theoretical_count"] == 3
+    assert result.summary["S_LCB"] == pytest.approx(1.05*.5/(.5+.05))
+    assert result.summary["S_HG"] == pytest.approx(1.)
+    expected = 60 + 20*(1.05*.5/.55) + 20
     assert result.summary["multi_evidence_score"] == pytest.approx(expected)
     assert result.summary["annotation_level"] == "molecular_species"
 
@@ -34,12 +33,12 @@ def test_full_spectrum_normalization_is_scale_invariant():
     a = evaluate(masses=(100.,200.,210.,300.,400.,999.),intensities=(100.,50.,50.,25.,10.,200.))
     b = evaluate(masses=(100.,200.,210.,300.,400.,999.),intensities=(1000.,500.,500.,250.,100.,2000.))
     assert a.summary["multi_evidence_score"] == pytest.approx(b.summary["multi_evidence_score"])
-    assert a.summary["S_HG"] == pytest.approx(.5/.6)
+    assert a.summary["S_HG"] == pytest.approx(1.1*.5/.6)
 
 
 def test_k_behavior():
-    a = evaluate(config=EvidenceScoringConfig(k_hg=.10))
-    b = evaluate(config=EvidenceScoringConfig(k_hg=.05))
+    a = evaluate(masses=(100.,999.),intensities=(50.,100.),config=EvidenceScoringConfig(primary_half_intensity=.10))
+    b = evaluate(masses=(100.,999.),intensities=(50.,100.),config=EvidenceScoringConfig(primary_half_intensity=.05))
     assert a.summary["S_HG"] < b.summary["S_HG"]
 
 
@@ -56,7 +55,7 @@ def test_duplicate_mass_priority_scores_once_and_no_centroid_reuse():
     result = evaluate(theory,masses=(100.,210.,300.,400.),intensities=(100.,50.,25.,10.))
     assert result.fragments.theoretical_mz.is_unique
     assert result.fragments[result.fragments.theoretical_mz.eq(100.)].fragment_type.iloc[0] == "HG"
-    assert result.summary["N_HG"] == 1 and result.summary["N_LCB"] == 2
+    assert result.summary["primary_theoretical_count"] == 1 and result.summary["secondary_theoretical_count"] == 2
     nearby = synthetic_sm()
     nearby.loc[1,"theoretical_mz"] = 100.0001
     result = evaluate(nearby,masses=(100.,),intensities=(100.,))
@@ -64,11 +63,11 @@ def test_duplicate_mass_priority_scores_once_and_no_centroid_reuse():
     assert result.summary["S_LCB"] == 0.
 
 
-def test_no_template_renormalization_for_missing_theory_group():
+def test_diagnostic_nl_unmapped_for_sm_does_not_affect_score():
     theory = synthetic_sm()
     result = evaluate(theory[theory.fragment_type.ne("NL")])
-    assert result.summary["multi_evidence_score"] is None
-    assert result.summary["score_status"] == "missing_theoretical_groups:NL"
+    assert result.summary["multi_evidence_score"] == evaluate().summary["multi_evidence_score"]
+    assert result.summary["S_NL"] is None
 
 
 def test_precursor_fragment_cannot_enter_msms_score():

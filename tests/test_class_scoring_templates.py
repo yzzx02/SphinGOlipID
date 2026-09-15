@@ -1,23 +1,27 @@
 import pytest
 from sphingolipid_toolkit.evidence_config import (
-    CLASS_RULES, SCORING_TEMPLATES, ClassEvidenceRule, EvidenceScoringConfig,
-    ScoringTemplate, class_mapping_records, get_class_rule,
+    CLASS_RULES, STRUCTURAL_EVIDENCE_REGISTRY, POOL_WEIGHTS, ClassEvidenceRule,
+    EvidenceScoringConfig, class_mapping_records, get_class_rule,
 )
 
 
-def test_exact_author_weights_and_sum():
-    assert dict(SCORING_TEMPLATES["HG-dominant"].weights) == {"HG":60,"LCB":20,"NL":15,"common":5}
-    assert dict(SCORING_TEMPLATES["NL-dominant glycosphingolipid"].weights) == {"LCB":35,"NL":55,"common":10}
-    assert dict(SCORING_TEMPLATES["LCB-dominant"].weights) == {"LCB":60,"NL":30,"common":10}
-    assert all(sum(dict(template.weights).values()) == 100 for template in SCORING_TEMPLATES.values())
+def test_fixed_weights_and_registered_two_chain_policies():
+    assert dict(POOL_WEIGHTS) == {"primary":60,"secondary":20,"support":20}
+    assert CLASS_RULES is STRUCTURAL_EVIDENCE_REGISTRY
+    for rule in CLASS_RULES.values():
+        if rule.chain_count == 2:
+            assert rule.scoring_policy == "structural_60_20_20"
 
 
-@pytest.mark.parametrize("lipid,template", [("SM","HG-dominant"),("GM3","HG-dominant"),
-    ("PE_cer","HG-dominant"),("N_CAEP","HG-dominant"),("CerP","HG-dominant"),
-    ("Cer","LCB-dominant"),("HexCer","NL-dominant glycosphingolipid"),
-    ("LacCer","NL-dominant glycosphingolipid"),("Gb3Cer","NL-dominant glycosphingolipid")])
-def test_subclass_template_mapping(lipid,template):
-    assert get_class_rule(lipid).scoring_template == template
+@pytest.mark.parametrize("lipid,primary,secondary", [
+    ("SM","HG","LCB"),("GM3","HG","LCB"),("PE_cer","HG","LCB"),
+    ("N_CAEP","HG","LCB"),("CerP","HG","LCB"),
+    ("Cer","LCB","diagnostic_nl"),("HexCer","diagnostic_nl","LCB"),
+    ("Hex2Cer","diagnostic_nl","LCB"),("LacCer","diagnostic_nl","LCB"),
+    ("Gb3Cer","diagnostic_nl","LCB"),("type-I-B","diagnostic_nl","LCB")])
+def test_subclass_mapping(lipid,primary,secondary):
+    rule = get_class_rule(lipid)
+    assert (rule.primary_evidence,rule.secondary_evidence) == (primary,secondary)
 
 
 def test_all_class_rows_have_explicit_gates_or_unspecified_status():
@@ -26,7 +30,7 @@ def test_all_class_rows_have_explicit_gates_or_unspecified_status():
     for row in rows:
         assert "common" not in row["species_gate"]
         assert "common" not in row["molecular_species_gate"]
-        assert row["scoring_template"] in {*SCORING_TEMPLATES,"UNSPECIFIED"}
+        assert row["scoring_policy"] in {"structural_60_20_20","UNSPECIFIED"}
     assert get_class_rule("MysteryCer").status == "UNSPECIFIED"
 
 
@@ -37,33 +41,38 @@ def test_single_chain_rules_are_explicit_not_cer_defaults():
     assert get_class_rule("Glu_So").molecular_groups == ("NL","LCB")
     for name in ("So","S1P","Lyso_SM","Lyso_sulfo","Glu_So","Gb3_So"):
         assert get_class_rule(name).chain_count == 1
-        assert get_class_rule(name).scoring_template is None
+        assert get_class_rule(name).scoring_policy == "UNSPECIFIED"
 
 
 def test_registry_can_be_explicitly_extended():
-    custom = ClassEvidenceRule("Example",(),False,("NL",),("NL","LCB"),"LCB-dominant")
+    custom = ClassEvidenceRule("Example",(),False,("NL",),("NL","LCB"),"diagnostic_nl","LCB")
     assert get_class_rule("Example",{"Example":custom}) is custom
 
 
 def test_custom_registry_classification_and_no_common_gate():
     from sphingolipid_toolkit.evidence import classify_fragment
-    custom = ClassEvidenceRule("ReviewedAlias",("SM",),True,("HG",),("HG","LCB"),"HG-dominant")
+    custom = ClassEvidenceRule("ReviewedAlias",("SM",),True,("HG",),("HG","LCB"),"HG","LCB")
     record = classify_fragment("ReviewedAlias","[phosphocholine+H]+",registry={"ReviewedAlias":custom})
     assert record.fragment_type.value == "HG"
     with pytest.raises(ValueError):
-        ClassEvidenceRule("Invalid",(),False,("common",),("common","LCB"),None)
+        ClassEvidenceRule("Invalid",(),False,("common",),("common","LCB"),None,None)
     with pytest.raises(ValueError):
-        ClassEvidenceRule("Invalid",(),True,("HG",),("LCB",),None)
+        ClassEvidenceRule("Invalid",(),True,("HG",),("LCB",),None,None)
 
 
-@pytest.mark.parametrize("kwargs", [{"k_hg":0},{"k_nl":-1},{"k_lcb":float("nan")},
+@pytest.mark.parametrize("kwargs", [{"primary_half_intensity":0},{"secondary_half_intensity":-1},{"primary_half_intensity":float("nan")}, {"precursor_cluster_exclusion_da":-1},
     {"minimum_normalized_intensity":2},{"minimum_group_fraction":0}])
 def test_invalid_config_rejected(kwargs):
     with pytest.raises(ValueError):
         EvidenceScoringConfig(**kwargs)
 
 
-def test_precursor_weights_and_wrong_totals_are_rejected():
-    for weights in [(("Precursor",100),),(("HG",90),),(("HG",50),("HG",50))]:
+def test_support_and_precursor_cannot_be_structural_pools():
+    for evidence in ("Precursor", "common", "supporting_nl"):
         with pytest.raises(ValueError):
-            ScoringTemplate("bad",weights)
+            ClassEvidenceRule("bad",(),False,("NL",),("NL","LCB"),evidence,"LCB")
+
+
+def test_single_chain_scoring_policy_cannot_be_invented():
+    with pytest.raises(ValueError):
+        ClassEvidenceRule("So",(),False,("LCB",),("LCB",),"LCB","HG",1)

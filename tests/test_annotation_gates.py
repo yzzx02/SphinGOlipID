@@ -40,7 +40,7 @@ def test_strong_common_cannot_rescue_hg_or_nl_gate():
     for lipid in ("SM","Cer"):
         result = evaluate(lipid,["d18:1","d18:1+OH","[C2H5NO+H]+"],[0,1,2])
         assert result.summary["annotation_level"] == "candidate"
-        assert result.summary["S_common"] > .9
+        assert result.summary["S_supp"] > .9
         assert result.summary["confidence_score"] is None
 
 
@@ -80,7 +80,7 @@ def test_single_chain_never_claims_inferred_fa():
     assert result.summary["annotation_level"] == "molecular_species"
     assert result.summary["fa_assignment_mode"] == "not_applicable_single_chain"
     assert not result.summary["fa_directly_fragment_confirmed"]
-    assert result.summary["score_status"] == "UNSPECIFIED_template"
+    assert result.summary["score_status"] == "UNSPECIFIED_policy"
 
 
 def test_actual_so_generator_does_not_invent_lcb_evidence():

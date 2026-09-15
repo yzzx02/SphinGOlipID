@@ -342,17 +342,21 @@ Historical identification and RT outputs have not been regenerated.
 
 ## Multi-evidence annotation and scoring
 
-An opt-in evidence adapter adds `Precursor / HG / LCB / NL / common` metadata,
-class-specific gates and the three author-specified scoring templates alongside
-legacy scores. Each required evidence group must independently match at least
-50% of its eligible theoretical fragments. Cer mono/didehydration is diagnostic
-NL under the author's explicit Cer-only policy; other common evidence cannot
-satisfy a structural gate.
+Five chemical evidence types (`Precursor / HG / LCB / NL / common`) map to
+three scoring pools with fixed weights **primary 60 / secondary 20 / support 20**.
+Primary and secondary use the maximum matched quality `(1+k)*I/(I+k)`, with
+k=0.10 / 0.05 and non-precursor base-peak normalization (±4.1 Da exclusion).
+Support contains only common/supporting NL and scores by matched count,
+saturating at `min(eligible theory count, 3)`. Diagnostic NL never also scores
+as Support. Missing pools are explicit; weights are not redistributed.
 
-Intensity uses the complete spectrum's base peak before `I / (I + k)` scoring.
-One-to-one matching remains unchanged. Batch outputs and archived results are
-not automatically rescored. See [the scoring specification](docs/MULTI_EVIDENCE_SCORING.md)
-and [implementation report](docs/MULTI_EVIDENCE_IMPLEMENTATION_REPORT.md), including
-unresolved single-chain templates and glycan representative-fragment validation.
+Each required structural group independently needs 50% eligible coverage.
+Cer mono/didehydration remains an author-defined structural policy, not proof
+of subclass identity or exclusion of HexCer in-source fragmentation.
+Single-chain policies remain UNSPECIFIED. Legacy scores coexist through opt-in
+adapters; default batch outputs and historical results are not rescored.
 
-Synthetic comparison only: `python scripts/multi_evidence_shadow.py`.
+See [the scoring specification](docs/MULTI_EVIDENCE_SCORING.md) and
+[implementation report](docs/MULTI_EVIDENCE_IMPLEMENTATION_REPORT.md).
+Synthetic comparisons against legacy and bd428de scoring:
+`python scripts/multi_evidence_shadow.py`.

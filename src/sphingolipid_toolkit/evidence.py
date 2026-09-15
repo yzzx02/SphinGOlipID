@@ -6,6 +6,7 @@ from contextvars import ContextVar
 from dataclasses import asdict, dataclass
 from enum import Enum
 from functools import wraps
+import json
 import re
 
 import pandas as pd
@@ -23,7 +24,8 @@ class EvidenceRole(str, Enum):
     PRECURSOR = "precursor"
     CLASS_DIAGNOSTIC = "class_diagnostic"
     CHAIN_SPECIFIC = "chain_specific"
-    STRUCTURE_INFORMATIVE = "structure_informative"
+    DIAGNOSTIC_NL = "diagnostic_nl"
+    SUPPORTING_NL = "supporting_nl"
     SUPPORTING = "supporting"
 
 
@@ -83,7 +85,8 @@ SOURCE_FUNCTIONS = tuple(dict.fromkeys((*HG_LABELS, *LOSS_TOKENS, "So", "O_FA_ce
 
 def _record(kind, *, eligible=True, diagnostic=False, source="legacy_label", reason="existing discrete rule", lcb="", status="classified"):
     role = {EvidenceType.PRECURSOR: EvidenceRole.PRECURSOR, EvidenceType.HG: EvidenceRole.CLASS_DIAGNOSTIC,
-        EvidenceType.LCB: EvidenceRole.CHAIN_SPECIFIC, EvidenceType.NL: EvidenceRole.STRUCTURE_INFORMATIVE,
+        EvidenceType.LCB: EvidenceRole.CHAIN_SPECIFIC,
+        EvidenceType.NL: EvidenceRole.DIAGNOSTIC_NL if diagnostic else EvidenceRole.SUPPORTING_NL,
         EvidenceType.COMMON: EvidenceRole.SUPPORTING}[kind]
     strength = "diagnostic" if diagnostic else "informative" if kind == EvidenceType.NL else "supporting"
     return EvidenceRecord(kind, role, eligible, strength,
@@ -117,7 +120,7 @@ def classify_fragment(lipid_class, fragment_name, fragment_origin=None, *, regis
         return _record(EvidenceType.LCB, diagnostic=True, source=provenance, lcb=lcb_key.group())
     if any(label in HG_LABELS.get(source, ()) for source in sources):
         return _record(EvidenceType.HG, diagnostic=True, source=provenance)
-    if rule.lipid_class == "Cer" and re.fullmatch(r"(?:Cer\([^)]*\)|M\+H|\[M\+H\]\+?)-(?:1?H2O|2H2O)", label):
+    if rule.lipid_class == "Cer" and re.fullmatch(r"(?:Cer\([^)]*\)|M|M\+H|\[M\+H\]\+?)-(?:1?H2O|2H2O)", label):
         return _record(EvidenceType.NL, diagnostic=True, source="author:Cer_dehydration",
             reason="Author designated Cer mono/didehydration as diagnostic NL; specificity requires validation")
     # Remove the intact lipid annotation before checking a loss suffix.
@@ -215,14 +218,41 @@ EVIDENCE_PRIORITY = {EvidenceType.HG.value: 0, EvidenceType.LCB.value: 1,
     EvidenceType.NL.value: 2, EvidenceType.COMMON.value: 3, EvidenceType.PRECURSOR.value: 4}
 
 
+class ScoringPool(str, Enum):
+    PRIMARY = "primary"
+    SECONDARY = "secondary"
+    SUPPORT = "support"
+
+
+POOL_PRIORITY = {"primary":0, "secondary":1, "support":2}
+
+
+def scoring_pool_for_evidence(fragment_type, evidence_role, rule):
+    """Chemical evidence class is not its subclass-specific scoring pool.
+
+    Unmapped diagnostic evidence stays explanatory, never becomes support.
+    Single-chain structural policies remain unset, even with a valid gate.
+    """
+    key = "diagnostic_nl" if fragment_type == "NL" and evidence_role == "diagnostic_nl" else fragment_type
+    if key == rule.primary_evidence:
+        return "primary"
+    if key == rule.secondary_evidence:
+        return "secondary"
+    if fragment_type == "common" or (fragment_type == "NL" and evidence_role == "supporting_nl"):
+        return "support"
+    return None
+
+
 def annotate_theoretical_fragments(table, lipid_class, origins=None, eligibility_overrides=None, *, registry=None):
     """Add metadata and canonicalize exact-mass evidence; preserve legacy columns.
 
-    All labels are retained. Equal masses count once with HG > LCB > NL >
-    common, irrespective of which label happens to be first. Explicit eligibility
+    All labels are retained. Equal masses count once with primary > secondary >
+    support, irrespective of which label happens to be first. Explicit eligibility
     overrides are keyed by exact fragment label and must be documented by caller.
     """
     data = table.copy()
+    from .evidence_config import get_class_rule
+    rule = get_class_rule(lipid_class, registry)
     name_col = next((c for c in ("fragment_name", "idf", "id") if c in data), None)
     mass_col = next((c for c in ("theoretical_mz", "mz") if c in data), None)
     if name_col is None or mass_col is None:
@@ -242,23 +272,27 @@ def annotate_theoretical_fragments(table, lipid_class, origins=None, eligibility
             if origin is None and "fragment_origin" in row and pd.notna(row["fragment_origin"]):
                 origin = row["fragment_origin"]
             metadata = classify_fragment(lipid_class, label, origin, registry=registry).to_dict()
+            metadata["scoring_pool"] = scoring_pool_for_evidence(metadata["fragment_type"], metadata["evidence_role"], rule)
             if eligibility_overrides and label in eligibility_overrides:
                 metadata["scoring_eligible"] = bool(eligibility_overrides[label])
                 metadata["gate_eligible"] = metadata["scoring_eligible"] and metadata["diagnostic_strength"] == "diagnostic"
                 metadata["eligibility_reason"] = "explicit caller eligibility override"
             rows.append({**row.to_dict(), **metadata, "fragment_name":label,"theoretical_mz":mass})
     if not rows:
-        return pd.DataFrame(columns=list(data.columns) + ["fragment_name", "theoretical_mz"] + list(_record(EvidenceType.COMMON).to_dict()))
+        return pd.DataFrame(columns=list(data.columns) + ["fragment_name", "theoretical_mz", "scoring_pool"] + list(_record(EvidenceType.COMMON).to_dict()))
     expanded = pd.DataFrame(rows)
     result = []
     groups = ["anno", "theoretical_mz"] if "anno" in expanded else ["theoretical_mz"]
     for _, group in expanded.groupby(groups, sort=True, dropna=False):
-        ordered = group.assign(_priority=group.fragment_type.map(EVIDENCE_PRIORITY)).sort_values(
-            ["_priority", "scoring_eligible", "fragment_name"], ascending=[True,False,True], kind="stable")
-        chosen = ordered.iloc[0].drop(labels="_priority").to_dict()
+        ordered = group.assign(_priority=group.scoring_pool.map(POOL_PRIORITY).fillna(3),
+            _chemical_priority=group.fragment_type.map(EVIDENCE_PRIORITY)).sort_values(
+            ["_priority", "scoring_eligible", "_chemical_priority", "fragment_name"], ascending=[True,False,True,True], kind="stable")
+        chosen = ordered.iloc[0].drop(labels=["_priority", "_chemical_priority"]).to_dict()
         chosen["selected_evidence_label"] = chosen["fragment_name"]
         chosen["fragment_name"] = " | ".join(sorted(set(group.fragment_name)))
         chosen["all_evidence_types"] = " | ".join(sorted(set(group.fragment_type), key=EVIDENCE_PRIORITY.get))
+        fields = ["fragment_name", *list(_record(EvidenceType.COMMON).to_dict())]
+        chosen["evidence_annotations"] = json.dumps(group[fields].sort_values("fragment_name").to_dict("records"),ensure_ascii=False)
         # Preserve the original label field, merging instead of losing labels.
         chosen[name_col] = chosen["fragment_name"]
         result.append(chosen)

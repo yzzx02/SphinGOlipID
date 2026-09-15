@@ -1,0 +1,24 @@
+{
+  "repository": "yzzx02/LipidGate",
+  "commit": "747dfacc4789c0d74e0f00fa2c7696ee8c423c08",
+  "path": "src/lipidgate/ms2/scoring.py",
+  "functions_reviewed": [
+    "_calculate_pool_scores",
+    "_saturation_fragment_quality",
+    "_non_precursor_quality_overrides",
+    "_non_precursor_base_intensity"
+  ],
+  "structural_quality": "min((1+k)*clip(I,0,1)/(clip(I,0,1)+k),1)",
+  "pool_aggregation": "max(matched structural quality), default 0 if no matches",
+  "primary_k": 0.1,
+  "secondary_k": 0.05,
+  "precursor_cluster_exclusion_da": 4.1,
+  "support_target": "min(scoring_eligible_support_theory_count,3)",
+  "support_quality": "min(matched_count/support_target,1) when support_target>0",
+  "intentional_differences": [
+    "SphinGOlipID weights remain fixed at 60/20/20; no dynamic redistribution",
+    "Absent SphinGOlipID pools report NA rather than pretending to have been evaluated",
+    "Existing SphinGOlipID gate, one-to-one assignment and eligibility policies are retained",
+    "Selected precursor centroid itself is excluded from scoring/gate evidence"
+  ]
+}
