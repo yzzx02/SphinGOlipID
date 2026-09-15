@@ -7,6 +7,12 @@ from pathlib import Path
 from typing import Sequence
 
 
+# Historical workflow defaults intentionally differ; neither is a manuscript
+# final-data assertion. All matching tolerances are supplied through config.
+LEGACY_FRAGMENT_PPM = 20.0
+TARGETED_FRAGMENT_PPM = 10.0
+
+
 @dataclass(frozen=True)
 class SphinGOlipIDConfig:
     """Unified configuration shared by CLI, GUI, and tests.
@@ -28,7 +34,7 @@ class SphinGOlipIDConfig:
     log_file_name: str = "run_log.txt"
     intermediate_dir_name: str = "intermediate"
     encoding: str = "GBK"
-    fragment_ppm: float = 20.0
+    fragment_ppm: float = LEGACY_FRAGMENT_PPM
     min_fragment_intensity: float = 20.0
     min_matched_fragments: int = 2
     min_match_score: float = 0.35

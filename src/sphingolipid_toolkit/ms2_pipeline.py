@@ -13,7 +13,7 @@ from typing import List, Sequence, Tuple
 import pandas as pd
 
 from . import ms2_legacy_core as core
-from .config import SphinGOlipIDConfig
+from .config import LEGACY_FRAGMENT_PPM, SphinGOlipIDConfig
 from .io_utils import (
     read_ms2_spectra_text,
     validate_ms2_file_inputs,
@@ -43,7 +43,7 @@ class MS2PipelineConfig:
     log_file_name: str = "run_log.txt"
     intermediate_dir_name: str = "intermediate"
     encoding: str = "GBK"
-    fragment_ppm: float = 20.0
+    fragment_ppm: float = LEGACY_FRAGMENT_PPM
     min_fragment_intensity: float = 20.0
     min_matched_fragments: int = 2
     min_match_score: float = 0.35
@@ -148,7 +148,12 @@ def _write_db_sheets(out_db_csv: Path, db_data_xlsx: Path, parameter: float) -> 
 
     # Keep the original scoring idea: duplicated theoretical fragment m/z values
     # within the same annotation are counted once.
-    resultp = dfs.groupby("anno", group_keys=False).apply(lambda x: x.drop_duplicates(subset="mz"))
+    def merge_labels(group: pd.DataFrame) -> pd.DataFrame:
+        group = group.copy()
+        labels = group.groupby("mz")["idf"].agg(lambda xs: " | ".join(sorted(set(xs.astype(str)))))
+        group["idf"] = group["mz"].map(labels)
+        return group.drop_duplicates(subset="mz")
+    resultp = dfs.groupby("anno", group_keys=False).apply(merge_labels)
     if resultp.empty:
         return False
     grouped_s = resultp.groupby("target")
@@ -199,7 +204,11 @@ def _finalize_results(out_query_csv: Path, result_xlsx: Path, min_matched_fragme
         group["总分数"] = (100 - (rank - 1) * 10) * group["匹配度分数"]
         max_intensity = group["强度总和"].max()
         group["相对强度"] = (group["强度总和"] / max_intensity).round(2)
-        result = pd.concat([result, group.nlargest(top_n, "总分数")], ignore_index=True)
+        selected = group.sort_values(
+            ["总分数", "匹配度分数", "强度总和", "注释"],
+            ascending=[False, False, False, True], kind="stable",
+        ).head(top_n)
+        result = pd.concat([result, selected], ignore_index=True)
 
     result.reset_index(drop=True, inplace=True)
     result = add_standard_score_columns(result)
@@ -212,6 +221,7 @@ def run_one_file(config: ConfigLike, file_index: int, logger: logging.Logger | N
 
     config = _coerce_config(config)
     logger = logger or get_logger("sphingolipid_toolkit.ms2")
+    logger.info("Effective fragment_ppm=%s (legacy text workflow config)", config.fragment_ppm)
     input_dir = Path(config.input_dir)
     precursor_dir = Path(config.precursor_dir or config.input_dir)
     output_dir = Path(config.output_dir)

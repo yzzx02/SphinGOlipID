@@ -220,8 +220,10 @@ validation modes:
 - IUP searches the original candidates independently within the locked
   `0.20 min` RT window and `0.05 min` IUP allowance. Parallelism and ordering
   guide candidate selection but do not silently relax either threshold.
-- Linear models are preferred unless a quadratic model has at least four
-  distinct carbon numbers and improves R² by at least `0.002`.
+- Linear-first: accept a valid Linear model immediately. Evaluate Quadratic
+  only when Linear fails; Quadratic requires at least four distinct carbon
+  numbers, R² ≥ 0.99 and a physically plausible positive trend. Rescue also
+  prefers Linear when it satisfies the applicable constraints.
 - Plot legends report only the unsaturation and fitted R².
 
 ## Six-fraction supplementary information
@@ -321,3 +323,40 @@ sphingolipid-targeted-mzml \
 ```
 
 See `docs/TARGETED_MZML_WORKFLOW.md`.
+
+## Scientific logic correction
+
+Production MS/MS matching now uses deterministic one-to-one centroid assignment:
+maximum pair count, minimum total absolute ppm error, then observed intensity.
+Identical theoretical masses retain alternative labels but score once.
+
+The final-manuscript glycan syntax is `Gal-Gal(-Fuc)-GlcNAc-Gal-Glc`:
+`(-Fuc)` attaches to the preceding Gal. Historical space-separated residues with
+integer branch positions remain supported. `#`, nested or multi-residue branches
+are undefined and rejected. CSV can supply `glycan_encoding` and optional
+`branch_positions` (or legacy `structure` and `classy`) explicitly.
+
+See [the scientific logic report](docs/SCIENTIFIC_LOGIC_UPDATE_REPORT.md) for
+syntax scope, production integration, synthetic comparisons and verification.
+Historical identification and RT outputs have not been regenerated.
+
+## Multi-evidence annotation and scoring
+
+Five chemical evidence types (`Precursor / HG / LCB / NL / common`) map to
+three scoring pools with fixed weights **primary 60 / secondary 20 / support 20**.
+Primary and secondary use the maximum matched quality `(1+k)*I/(I+k)`, with
+k=0.10 / 0.05 and non-precursor base-peak normalization (±4.1 Da exclusion).
+Support contains only common/supporting NL and scores by matched count,
+saturating at `min(eligible theory count, 3)`. Diagnostic NL never also scores
+as Support. Missing pools are explicit; weights are not redistributed.
+
+Each required structural group independently needs 50% eligible coverage.
+Cer mono/didehydration remains an author-defined structural policy, not proof
+of subclass identity or exclusion of HexCer in-source fragmentation.
+Single-chain policies remain UNSPECIFIED. Legacy scores coexist through opt-in
+adapters; default batch outputs and historical results are not rescored.
+
+See [the scoring specification](docs/MULTI_EVIDENCE_SCORING.md) and
+[implementation report](docs/MULTI_EVIDENCE_IMPLEMENTATION_REPORT.md).
+Synthetic comparisons against legacy and bd428de scoring:
+`python scripts/multi_evidence_shadow.py`.
