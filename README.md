@@ -176,8 +176,8 @@ result_msms-{i}.xlsx
 
 ## Run Desktop GUI
 
-The Tkinter desktop GUI keeps the earlier lab software layout while calling the
-current `run_batch(config)` backend:
+The Tkinter desktop GUI provides setup and MS2 result-review tabs while calling
+the current `run_batch(config)` backend:
 
 ```bash
 python -m sphingolipid_toolkit.gui
@@ -192,6 +192,10 @@ sphingolipid-gui
 The GUI accepts one raw TXT file, one precursor XLSX file, one MS1 database XLSX
 file, and an output folder. The selected single TXT/XLSX pair is mapped to the
 backend's configurable file-name patterns and processed as file index `1`.
+Matching parameters are editable; the run monitor shows processing stages and
+elapsed time. Results support name search, score filtering, column sorting,
+candidate details, and saving the complete original workbook. See
+`docs/GUI_GUIDE.md` for the desktop workflow.
 
 ## Retention Time IUP Validation
 
@@ -305,7 +309,7 @@ cleaned.to_excel("annotation_results_cleaned.xlsx", index=False)
 ## What is still reserved for later
 
 - Full theoretical formula-library construction from class templates.
-- GUI implementation.
+- GUI integration of RT validation and result cleaning.
 - More end-to-end tests once real example input data are provided.
 
 ## Targeted mzML workflow
