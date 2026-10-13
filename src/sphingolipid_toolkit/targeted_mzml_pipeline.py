@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import csv
 import os
 import re
 from dataclasses import dataclass
@@ -15,6 +16,9 @@ import pandas as pd
 from pyteomics import mzml
 
 from . import ms2_legacy_core as core
+from .config import TARGETED_FRAGMENT_PPM
+from .fragment_assignment import select_one_to_one_edges
+from .glycan_encoding import parse_glycan_encoding
 from .io_utils import ensure_output_dir, read_ms1_library
 from .logging_utils import attach_file_handler, configure_logging, get_logger
 from .rt_validation import add_series_columns, fit_ransac_models, predict_rt
@@ -30,7 +34,7 @@ class TargetedMzMLConfig:
     output_dir: Path
     targetlist_dir: Path | None = None
     mzml_dir: Path | None = None
-    fragment_ppm: float = 10.0
+    fragment_ppm: float = TARGETED_FRAGMENT_PPM
     min_fragment_intensity: float = 20.0
     min_matched_fragments: int = 2
     min_match_score: float = 0.35
@@ -98,6 +102,7 @@ def run_targeted_mzml_batch(
     logger = logger or get_logger("sphingolipid_toolkit.targeted_mzml")
     output_dir = ensure_output_dir(config.output_dir)
     attach_file_handler(output_dir / config.log_file_name, logger=logger)
+    logger.info("Effective fragment_ppm=%s (targeted mzML workflow config)", config.fragment_ppm)
 
     logger.info("Building combined MS1 feature table from targetlists")
     targetlist_raw = read_targetlist_directory(config.targetlist_dir)
@@ -339,6 +344,7 @@ def annotate_one_spectrum(
 
     logger = logger or get_logger("sphingolipid_toolkit.targeted_mzml")
     feature_id = str(feature["feature_id"])
+    logger.debug("Effective fragment_ppm=%s for scan %s", config.fragment_ppm, spectrum.scan_id)
     candidates = search_ms1_candidates(
         library,
         observed_mz=float(feature["feature_mz"]),
@@ -436,11 +442,16 @@ def generate_legacy_fragments_for_candidates(
         for _, row in candidates.iterrows():
             core.frag_id1 = ["[C2H5NO+H]+"]
             core.frag_mz1 = [60.044]
+            structure = row.get("structure", "")
+            classy = row["classy"]
+            if isinstance(structure, str) and structure and not re.match(r"^[a-zA-Z]", str(classy)):
+                # A malformed encoding is an input error, not an absent match.
+                parse_glycan_encoding(structure, classy)
             try:
                 core.learn_fuc(
                     row["classy"],
                     row["name"],
-                    row.get("structure", ""),
+                    structure,
                     float(observed_mz),
                     float(ms1_rt),
                     float(abundance),
@@ -455,7 +466,12 @@ def generate_legacy_fragments_for_candidates(
     fragments.columns = ["idf", "mz", "anno", "total", "target", "lenDB", "RT", "Abund"]
     fragments["mz"] = pd.to_numeric(fragments["mz"], errors="coerce")
     fragments = fragments.dropna(subset=["mz"])
-    deduplicated = [group.drop_duplicates(subset="mz") for _, group in fragments.groupby("anno", sort=False)]
+    deduplicated = []
+    for _, group in fragments.groupby("anno", sort=False):
+        group = group.copy()
+        labels = group.groupby("mz")["idf"].agg(lambda xs: " | ".join(sorted(set(xs.astype(str)))))
+        group["idf"] = group["mz"].map(labels)
+        deduplicated.append(group.drop_duplicates(subset="mz"))
     return pd.concat(deduplicated, ignore_index=True) if deduplicated else pd.DataFrame(columns=fragments.columns)
 
 
@@ -481,17 +497,26 @@ def match_observed_to_theoretical(
     rows: list[pd.DataFrame] = []
     lows = theory["low"].to_numpy(dtype=float)
     ups = theory["up"].to_numpy(dtype=float)
-    for mz_value, intensity_value in zip(observed_mz, observed_intensity):
+    for observed_id, (mz_value, intensity_value) in enumerate(zip(observed_mz, observed_intensity)):
         mask = (lows <= mz_value) & (ups >= mz_value)
         if not np.any(mask):
             continue
         matched = theory.loc[mask].copy()
         matched["idx"] = spectrum.scan_id
+        matched["_observed_id"] = observed_id
+        matched["_observed_mz"] = float(mz_value)
+        matched["_observed_intensity"] = float(intensity_value)
         matched["relmz"] = round(float(mz_value), 4)
         matched["intense"] = round(float(intensity_value), 4)
         matched["fragment_error_ppm"] = (matched["mz"].astype(float) - float(mz_value)).abs() / matched["mz"].astype(float).abs().clip(lower=1e-12) * 1_000_000
         rows.append(matched)
-    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+    if not rows:
+        return pd.DataFrame()
+    return select_one_to_one_edges(
+        pd.concat(rows, ignore_index=True), observed_cols=["idx", "_observed_id"],
+        observed_mz_col="_observed_mz", intensity_col="_observed_intensity",
+        theoretical_mz_col="mz", candidate_cols=["anno"], label_col="idf",
+    )
 
 
 def finalize_spectrum_matches(
@@ -504,6 +529,12 @@ def finalize_spectrum_matches(
 
     if matched.empty:
         return pd.DataFrame()
+    matched = select_one_to_one_edges(
+        matched, observed_cols=["idx", "_observed_id"] if "_observed_id" in matched else ["idx", "relmz", "intense"],
+        observed_mz_col="_observed_mz" if "_observed_mz" in matched else "relmz",
+        intensity_col="_observed_intensity" if "_observed_intensity" in matched else "intense",
+        theoretical_mz_col="mz", candidate_cols=["anno"], label_col="idf",
+    )
     cleaned_frames = [
         group.sort_values("intense", ascending=False).drop_duplicates("mz", keep="first")
         for _, group in matched.groupby("anno", sort=False)
@@ -533,7 +564,11 @@ def finalize_spectrum_matches(
         group["总分数"] = (100 - (rank - 1) * 10) * group["匹配度分数"]
         max_intensity = group["强度总和"].max()
         group["相对强度"] = (group["强度总和"] / max_intensity).round(2)
-        result = pd.concat([result, group.nlargest(top_n, "总分数")], ignore_index=True)
+        selected = group.sort_values(
+            ["总分数", "匹配度分数", "强度总和", "注释"],
+            ascending=[False, False, False, True], kind="stable",
+        ).head(top_n)
+        result = pd.concat([result, selected], ignore_index=True)
     return result.reset_index(drop=True)
 
 
@@ -644,6 +679,7 @@ def _read_masshunter_compound_csv(path: Path) -> pd.DataFrame:
         for line_number, line in enumerate(handle):
             if line.startswith("# Formula"):
                 header_line = line_number
+                header_columns = [c.strip() for c in next(csv.reader([line.lstrip("# ")]))]
                 break
     if header_line is None:
         raise ValueError(f"Cannot find '# Formula, RT, Mass, Cpd, Comments' header in {path}")
@@ -655,10 +691,10 @@ def _read_masshunter_compound_csv(path: Path) -> pd.DataFrame:
                 path,
                 encoding=encoding,
                 encoding_errors="ignore",
-                skiprows=header_line,
-                comment="#",
+                skiprows=header_line+1,
                 header=None,
-                names=["Formula", "RT", "Mass", "Cpd", "Comments"],
+                names=header_columns,
+                dtype=str,
             )
             break
         except UnicodeError as exc:
@@ -679,6 +715,17 @@ def _read_masshunter_compound_csv(path: Path) -> pd.DataFrame:
             "neutral_mass": neutral_mass,
         }
     )
+    structure_col = _first_existing(data,["structure","glycan_encoding"])
+    position_col = _first_existing(data,["branch_positions","classy"])
+    if structure_col:
+        supplied = data[structure_col].fillna("").astype(str)
+        mask = supplied.str.strip().ne("")
+        normalized.loc[mask,"structure"] = supplied[mask]
+        normalized.loc[mask,"classy"] = ""
+        if position_col:
+            normalized.loc[mask,"classy"] = data.loc[mask,position_col].fillna("").astype(str)
+        for _, row in normalized.loc[mask].iterrows():
+            parse_glycan_encoding(row["structure"],row["classy"])
     return normalized.dropna(subset=["理论值", "name"]).reset_index(drop=True)
 
 
@@ -730,6 +777,12 @@ def _derive_legacy_classy(name: object) -> str:
 
 def _derive_legacy_structure(name: object) -> str:
     head = _lipid_head(name)
+    # Explicit, historically evidenced templates; do not infer branch topology
+    # for GM1a/GM1b/GD1 isomers from a shared name prefix.
+    if head == "GM1":
+        return "Gal-GalNAc-Gal(-NeuAc)-Glc"
+    if head.lower() == "type i b antigen":
+        return "Gal-Gal(-Fuc)-GlcNAc-Gal-Glc"
     glycan_map = {
         "GlcCer": "-Glc",
         "GalCer": "-Gal",
@@ -772,7 +825,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--mzml-dir", type=Path, default=None, help="Folder containing mzML files. Defaults to --data-dir.")
     parser.add_argument("--ms1-db", required=True, type=Path, help="MS1 theoretical library Excel/CSV file.")
     parser.add_argument("--output-dir", required=True, type=Path, help="Output folder.")
-    parser.add_argument("--fragment-ppm", type=float, default=10.0, help="MS2 fragment matching tolerance in ppm. Default: 10.")
+    parser.add_argument("--fragment-ppm", type=float, default=TARGETED_FRAGMENT_PPM, help=f"MS2 fragment matching tolerance in ppm. Default: {TARGETED_FRAGMENT_PPM:g}.")
     parser.add_argument("--ms1-ppm", type=float, default=10.0, help="MS1 library candidate tolerance in ppm. Default: 10.")
     parser.add_argument("--feature-ppm", type=float, default=10.0, help="mzML precursor to targetlist feature tolerance in ppm. Default: 10.")
     parser.add_argument("--min-intensity", type=float, default=20.0)
