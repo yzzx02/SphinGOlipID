@@ -65,7 +65,7 @@ Isoglobotriglycosylceramide,Hex3Cer,True,531,204,ms2_composition_covered; outsid
 KDN-GM1,Hex3HexNAcKDNCer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid
 KDN-GM2,Hex2HexNAcKDNCer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid
 KDN-GM3,Hex2KDNCer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid
-LM1,,False,531,0,reference_name_formula_conflict
+LM1,,False,531,0,reference_only_verified_composition_unresolved_linkage
 LacCer,LacCer,True,3186,450,ms2_composition_covered; outside_current_eligible_library_grid
 Lc3Cer,Hex2HexNAcCer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid
 Lea-X,Hex4HexNAc2Fuc2Cer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid
@@ -81,8 +81,8 @@ Lyso-sulfo,SHexSPB,True,114,35,ms2_composition_covered; outside_current_eligible
 M(IP)2C,MIP2C,True,531,0,outside_current_eligible_library_grid
 MIPC,Hex-IPC,True,531,0,outside_current_eligible_library_grid
 ManManGlcCer,Hex3Cer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid
-"N,N,N-trimethylSo",,False,95,0,reference_only_unverified_adduct
-"N,N-dimethylSo",,False,95,0,reference_only_ambiguous_modification
+"N,N,N-trimethylSo",,False,95,0,reference_only_insufficient_structural_signature
+"N,N-dimethylSo","N,N-dimethylSo",True,95,1,ms2_composition_covered; outside_current_eligible_library_grid
 N-methylCAEP,N-methylCAEP,True,472,169,ms2_composition_covered; outside_current_eligible_library_grid
 N-methylSo,,False,95,0,reference_only_ambiguous_modification
 PECer,PE-Cer,True,1593,204,ms2_composition_covered; outside_current_eligible_library_grid

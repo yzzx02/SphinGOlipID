@@ -1,0 +1,708 @@
+{
+  "revision": "sphingolipid-literature-20261110-r1",
+  "package_version": "0.5.1",
+  "previous_checkpoint": "6758e5a0ca9f831cfdfba3299fe8de054087e70d",
+  "immutable_upstream_manifest": "config/engine_revision.json",
+  "previous_effective_rules_sha256": "d98a7d64a929e191031c55adcec4e9851d91a97ab4733cb57f2239f511a2ed87",
+  "effective_rules_sha256": "e06b5b6b9bfdb10a23719ffc24a8a9370a0689802460beefb7136a0f9f4f0b95",
+  "changed_vendor_files": {
+    "src/sphingolipid_toolkit/_vendor/lipidgate/ms2/positive_catalog_legacy_sphingolipid.py": {
+      "before_sha256": "0c9caca0557c700abedc4bed9c7cbf543622b7b6ecd748fcdcf82627435ef972",
+      "after_sha256": "ef48566f4178614fd944adb53097c92f85373428a385bbe4eff172aabc7f456e",
+      "scope": "Add native-CID d18:1 DMS class only; all previous classes retain their scientific behavior"
+    }
+  },
+  "library": {
+    "positive": {
+      "metadata": {
+        "version": 43,
+        "source_sha256": "95da719c2186af3e11f5d3050d141a6ed205acba3deee47f736d8956ad1bb43b",
+        "rules_sha256": "e06b5b6b9bfdb10a23719ffc24a8a9370a0689802460beefb7136a0f9f4f0b95",
+        "revision": "sphingolipid-literature-20261110-r1",
+        "previous_index_sha256": "f13e817c0da6a269cedbd788c88db5174a45718ae218cd17f42a67edb03907ab",
+        "fresh_normalization": true,
+        "index_format": 3,
+        "block_size": 1024,
+        "record_encoding": "fragment-columns-v3",
+        "record_count": 751877,
+        "classes": [
+          "AHexCer",
+          "ASM",
+          "Ac1HexCer",
+          "Ac2HexCer",
+          "Ac5HexCer",
+          "Ac6HexCer",
+          "CAEP",
+          "Cer",
+          "Cer1P",
+          "GD1",
+          "GD1a",
+          "GD1b",
+          "GD2",
+          "GD3",
+          "GM1",
+          "GM2",
+          "GM3",
+          "GQ1b",
+          "GT1",
+          "GT1b",
+          "Gal-Fuc-GD1",
+          "Gal-Fuc-GM1",
+          "Gb4",
+          "Hex-IPC",
+          "Hex2HexNAc2Cer",
+          "Hex2HexNAc2FucCer",
+          "Hex2HexNAc3FucCer",
+          "Hex2HexNAcCer",
+          "Hex2HexNAcKDNCer",
+          "Hex2KDNCer",
+          "Hex2NeuGcCer",
+          "Hex3Cer",
+          "Hex3FucCer",
+          "Hex3HexNAc2Cer",
+          "Hex3HexNAc2Fuc2Cer",
+          "Hex3HexNAc2FucCer",
+          "Hex3HexNAcFuc2Cer",
+          "Hex3HexNAcFucCer",
+          "Hex3HexNAcKDNCer",
+          "Hex3SPB",
+          "Hex4Cer",
+          "Hex4FucCer",
+          "Hex4HexNAc2Cer",
+          "Hex4HexNAc2Fuc2Cer",
+          "Hex4HexNAc2Fuc3Cer",
+          "Hex4HexNAc2FucCer",
+          "Hex4HexNAc3Cer",
+          "Hex4HexNAc3Fuc2Cer",
+          "Hex4HexNAc3FucCer",
+          "Hex4HexNAcCer",
+          "Hex4HexNAcFuc2Cer",
+          "Hex4HexNAcFucCer",
+          "Hex5Cer",
+          "Hex5HexNAc2FucCer",
+          "Hex5HexNAc3Cer",
+          "Hex5HexNAc3FucCer",
+          "Hex5HexNAcFucCer",
+          "HexCer",
+          "HexNeuAcCer",
+          "HexSPB",
+          "KetoSPB",
+          "LSM",
+          "LacCer",
+          "MIP2C",
+          "N,N-dimethylSo",
+          "N-methylCAEP",
+          "PE-Cer",
+          "PG-Cer",
+          "PI-Cer",
+          "S1P",
+          "SHexCer",
+          "SHexCer+O",
+          "SHexSPB",
+          "SL",
+          "SM",
+          "SPB"
+        ],
+        "adducts": [
+          "[M+2H-H2O]2+",
+          "[M+2H]2+",
+          "[M+2NH4]2+",
+          "[M+H+NH4]2+",
+          "[M+H-H2O]+",
+          "[M+H]+",
+          "[M+NH4]+",
+          "[M+Na]+"
+        ],
+        "equivalent_candidate_version": 2,
+        "search_plan_version": 1
+      },
+      "index_sha256": "118b6d0f200ad4391e96da7704bc5124d62787dcdf12353979d5015232811844",
+      "index_bytes": 46407680,
+      "raw_records_freshly_normalized": 744142,
+      "derived_records_freshly_generated": 7735,
+      "preserved_original_records": 751876,
+      "preserved_ids_order_and_all_scientific_fields": true,
+      "rebuilt_search_plans": true,
+      "blockwise_roundtrip_verified": true,
+      "new_record_ids": [
+        1815094
+      ]
+    },
+    "negative": {
+      "metadata": {
+        "version": 43,
+        "source_sha256": "c05a165449ff9be6b5fc93a05ee619b2c141edde3256181bf5a84c5e58a4d4f9",
+        "rules_sha256": "e06b5b6b9bfdb10a23719ffc24a8a9370a0689802460beefb7136a0f9f4f0b95",
+        "revision": "sphingolipid-literature-20261110-r1",
+        "previous_index_sha256": "964e8701400e674dc23e4695ee95207835b19145ac2ad5b45715ba3b3c7b899b",
+        "fresh_normalization": true,
+        "index_format": 3,
+        "block_size": 1024,
+        "record_encoding": "fragment-columns-v3",
+        "record_count": 348895,
+        "classes": [
+          "AHexCer",
+          "Cer",
+          "Cer1P",
+          "GM3",
+          "Hex-IPC",
+          "HexCer",
+          "PE-Cer",
+          "PE-Cer+O",
+          "PI-Cer",
+          "PI-Cer+O",
+          "SL",
+          "SL+O",
+          "SM"
+        ],
+        "adducts": [
+          "[M+CH3COO]-",
+          "[M+HCOO]-",
+          "[M-H]-"
+        ],
+        "equivalent_candidate_version": 2,
+        "search_plan_version": 1
+      },
+      "index_sha256": "b1b8dd5b814c34c19b8868387288924c3aff51593b927f97f0bda71cde4c5f9c",
+      "index_bytes": 23515136,
+      "raw_records_freshly_normalized": 348895,
+      "derived_records_freshly_generated": 0,
+      "preserved_original_records": 348895,
+      "preserved_ids_order_and_all_scientific_fields": true,
+      "rebuilt_search_plans": true,
+      "blockwise_roundtrip_verified": true,
+      "new_record_ids": []
+    }
+  },
+  "append": {
+    "added_records": 1,
+    "added_name": "N,N-dimethylSo(d18:1)",
+    "source_sha256": "2866791ba9abe9eeb26cd99386e1ad42f8f98f237021861f4b6a94e1c5611586",
+    "preserved_decompressed_prefix_bytes": 931344733,
+    "preserved_decompressed_prefix_sha256": "c1b538c7b0959d1df8853709d2a359557b5056b8bcfb4bf41dace77410a26a63",
+    "destination_sha256": "47bb116be47b2eb2a4305029c21c7b4cc6c6915a25cec836664d4974804deeef",
+    "eligible_parent_record_id": 350367
+  },
+  "chain_limit_curation": {
+    "original_records": 744142,
+    "retained_records": 744142,
+    "removed_records": 0,
+    "removed_records_by_class_adduct": {},
+    "removal_reason_counts": {},
+    "removed_examples": [],
+    "supported_sodium_totals": {
+      "Cer": 759,
+      "Cer1P": 375
+    },
+    "retained_records_sha256": "9f10a34a5b6894b8d2eda2927572ef7434038899a3115d715a3a483f2b1e5b9c",
+    "retained_records_content_and_order_unchanged": true,
+    "source_before_sha256": "47bb116be47b2eb2a4305029c21c7b4cc6c6915a25cec836664d4974804deeef",
+    "source_sha256": "95da719c2186af3e11f5d3050d141a6ed205acba3deee47f736d8956ad1bb43b",
+    "source_bytes": 29070151
+  },
+  "evidence_review": "config/sphingolipid_literature_review_20261110.json",
+  "previous_library_records_ids_scientific_fields_and_relative_order_preserved": true,
+  "previous_class_rules_and_ranking_code_unchanged": true,
+  "positive_changes": "Exactly one native protonated d18:1 DMS record",
+  "negative_changes": "Index rebuilt under current code fingerprint; raw MSP and all scientific records unchanged",
+  "original_lipidgate_libraries_changed": false,
+  "main_merged": false,
+  "reference_catalog": {
+    "source_sha256": "227f76c55b6d2cecfb3f535620ec81fd2c1c0c0cf63367d70a748c3f2d9aafb0",
+    "input_rows": 85710,
+    "unique_name_formula_rows": 79262,
+    "unique_names": 79262,
+    "reference_types": 113,
+    "coverage_status": {
+      "outside_current_eligible_library_grid": 50204,
+      "ms2_composition_covered": 22688,
+      "reference_only_verified_composition_unresolved_linkage": 531,
+      "reference_only_ambiguous_modification": 5743,
+      "reference_only_insufficient_structural_signature": 95,
+      "not_a_sphingolipid": 1
+    },
+    "by_reference_class": {
+      "1-O-acetyl-Cer": {
+        "reference_only_ambiguous_modification": 1980
+      },
+      "1-O-acetyl-ω-linoleoyloxy-Cer": {
+        "reference_only_ambiguous_modification": 1980
+      },
+      "3-keto Cer": {
+        "reference_only_ambiguous_modification": 1593
+      },
+      "Aleb": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Bleb": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "CAEP": {
+        "outside_current_eligible_library_grid": 676,
+        "ms2_composition_covered": 268
+      },
+      "CHS": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "CPS": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Cer": {
+        "outside_current_eligible_library_grid": 5293,
+        "ms2_composition_covered": 2445
+      },
+      "CerP": {
+        "outside_current_eligible_library_grid": 748,
+        "ms2_composition_covered": 196
+      },
+      "DHCerP": {
+        "outside_current_eligible_library_grid": 380,
+        "ms2_composition_covered": 151
+      },
+      "FMC-1": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FMC-2": {
+        "outside_current_eligible_library_grid": 397,
+        "ms2_composition_covered": 134
+      },
+      "FMC-3": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FMC-4": {
+        "outside_current_eligible_library_grid": 397,
+        "ms2_composition_covered": 134
+      },
+      "FMC-5": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FMC-6": {
+        "outside_current_eligible_library_grid": 397,
+        "ms2_composition_covered": 134
+      },
+      "FMC-7": {
+        "outside_current_eligible_library_grid": 397,
+        "ms2_composition_covered": 134
+      },
+      "Forssman antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGalGalGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGalGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGalGlcNAcGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGalNAcGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGlcNAcGalGalGlcCer": {
+        "outside_current_eligible_library_grid": 397,
+        "ms2_composition_covered": 134
+      },
+      "FucGlcNAcGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGlcNAcGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GA1": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GA2": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GM1": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GM2": {
+        "outside_current_eligible_library_grid": 408,
+        "ms2_composition_covered": 123
+      },
+      "GM3": {
+        "outside_current_eligible_library_grid": 408,
+        "ms2_composition_covered": 123
+      },
+      "GM3 NeuGc": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GM4": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalCer": {
+        "outside_current_eligible_library_grid": 2434,
+        "ms2_composition_covered": 752
+      },
+      "GalFucGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGalCer": {
+        "outside_current_eligible_library_grid": 381,
+        "ms2_composition_covered": 150
+      },
+      "GalGalGalGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGalGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGalNAcFucGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGalNAcGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGlcNAcGalGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGlcNAcGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGlcNAcGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGlcNAcGlcNAcGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalNAcGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalNAcGalGlcNAcGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalSo": {
+        "ms2_composition_covered": 18,
+        "outside_current_eligible_library_grid": 77
+      },
+      "Gb3": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Gb3So": {
+        "ms2_composition_covered": 18,
+        "outside_current_eligible_library_grid": 77
+      },
+      "GlcCer": {
+        "outside_current_eligible_library_grid": 2434,
+        "ms2_composition_covered": 752
+      },
+      "GlcNAcGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GlcNAcGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GlcNAcGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GlcNAcManGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GlcSo": {
+        "ms2_composition_covered": 18,
+        "outside_current_eligible_library_grid": 77
+      },
+      "Globoside I": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "I antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "IV3-nLcOse4": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Isoglobotriglycosylceramide": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "KDN-GM1": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "KDN-GM2": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "KDN-GM3": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "LM1": {
+        "reference_only_verified_composition_unresolved_linkage": 531
+      },
+      "LacCer": {
+        "outside_current_eligible_library_grid": 2736,
+        "ms2_composition_covered": 450
+      },
+      "Lc3Cer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Lea-X": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Leb": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Lex-5": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Lex-7": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Lex-9": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Ley-6": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Ley-8": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Ley-A-9": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Lyso-SM": {
+        "outside_current_eligible_library_grid": 76,
+        "ms2_composition_covered": 38
+      },
+      "Lyso-sulfo": {
+        "ms2_composition_covered": 35,
+        "outside_current_eligible_library_grid": 79
+      },
+      "M(IP)2C": {
+        "outside_current_eligible_library_grid": 531
+      },
+      "MIPC": {
+        "outside_current_eligible_library_grid": 531
+      },
+      "ManManGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "N,N,N-trimethylSo": {
+        "reference_only_insufficient_structural_signature": 95
+      },
+      "N,N-dimethylSo": {
+        "outside_current_eligible_library_grid": 94,
+        "ms2_composition_covered": 1
+      },
+      "N-methylCAEP": {
+        "outside_current_eligible_library_grid": 303,
+        "ms2_composition_covered": 169
+      },
+      "N-methylSo": {
+        "reference_only_ambiguous_modification": 95
+      },
+      "PECer": {
+        "outside_current_eligible_library_grid": 1389,
+        "ms2_composition_covered": 204
+      },
+      "PGCer": {
+        "outside_current_eligible_library_grid": 303,
+        "ms2_composition_covered": 169
+      },
+      "PICer": {
+        "outside_current_eligible_library_grid": 1596,
+        "ms2_composition_covered": 528
+      },
+      "SM": {
+        "outside_current_eligible_library_grid": 1121,
+        "ms2_composition_covered": 472
+      },
+      "SSEA-3 antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Sa": {
+        "ms2_composition_covered": 175,
+        "outside_current_eligible_library_grid": 401
+      },
+      "Sa1P": {
+        "outside_current_eligible_library_grid": 225,
+        "ms2_composition_covered": 3
+      },
+      "So": {
+        "ms2_composition_covered": 52,
+        "outside_current_eligible_library_grid": 233
+      },
+      "So1P": {
+        "outside_current_eligible_library_grid": 94,
+        "ms2_composition_covered": 1
+      },
+      "globo-Lex-9": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "ketoSa": {
+        "outside_current_eligible_library_grid": 113,
+        "ms2_composition_covered": 1
+      },
+      "ketoSo": {
+        "reference_only_ambiguous_modification": 95
+      },
+      "myriocin": {
+        "not_a_sphingolipid": 1
+      },
+      "nLc4Cer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type I A antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type I B antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type I H antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type II A antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type II B antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type II H antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type III A antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type IV A antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type IV B antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type IV H": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "ω-linoleoyloxy-Cer": {
+        "outside_current_eligible_library_grid": 1334,
+        "ms2_composition_covered": 141
+      },
+      "ω-linoleoyloxy-DHCer": {
+        "outside_current_eligible_library_grid": 341,
+        "ms2_composition_covered": 190
+      },
+      "ω-linoleoyloxy-GlcCer": {
+        "outside_current_eligible_library_grid": 763,
+        "ms2_composition_covered": 299
+      }
+    },
+    "ms2_coverage_library_source_sha256": "95da719c2186af3e11f5d3050d141a6ed205acba3deee47f736d8956ad1bb43b",
+    "rules_sha256": "e06b5b6b9bfdb10a23719ffc24a8a9370a0689802460beefb7136a0f9f4f0b95",
+    "asset_sha256": "be02a86e3583fbf1a8aced041860de11e554ce4ccbc49624a18e4247fde5f30d",
+    "asset_bytes": 815892,
+    "coverage_definition": "Class/subtype and precursor composition within 10 ppm; theoretical availability, not measured recall or unique structure confirmation."
+  },
+  "reference_catalog_corrections": {
+    "LM1_missing_NeuAc_rows": 531,
+    "trimethyl_intrinsic_cation_rows": 95,
+    "DMS_verified_compositions": 1,
+    "ms2_enabled_reference_type_names": 105,
+    "reference_only_sphingolipid_type_names": 7
+  },
+  "illustrative_gate_controls": {
+    "input_kind": "Published ion positions with synthetic heights; not measured recall",
+    "results": {
+      "literature_dms_peak_positions_synthetic_heights": [
+        {
+          "compound_class": "N,N-dimethylSo",
+          "matched_name": "N,N-dimethylSo(d18:1)",
+          "hg_score": 60.0,
+          "lcb_score": 0.0,
+          "other_score": 26.666666666666664,
+          "total_score": 86.6667,
+          "resolution_level": "species_level"
+        }
+      ],
+      "ordinary_spb20_peak_positions_synthetic_heights": [
+        {
+          "compound_class": "SPB",
+          "matched_name": "SPB(d20:1)",
+          "hg_score": 0.0,
+          "lcb_score": 75.0,
+          "other_score": 8.333333333333332,
+          "total_score": 83.3333,
+          "resolution_level": "chain_level"
+        }
+      ]
+    }
+  }
+}

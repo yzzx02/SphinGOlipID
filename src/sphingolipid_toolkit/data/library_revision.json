@@ -2,15 +2,15 @@
   "positive": {
     "metadata": {
       "version": 43,
-      "source_sha256": "2866791ba9abe9eeb26cd99386e1ad42f8f98f237021861f4b6a94e1c5611586",
-      "rules_sha256": "d98a7d64a929e191031c55adcec4e9851d91a97ab4733cb57f2239f511a2ed87",
-      "upstream_source_sha256": "b5ab2793190cd744350c002e1ad826b257e24593d5e82afe5164aacaa57f13a1",
-      "upstream_rules_sha256": "661b06f0dbd5f5366120efa057cdd3a57955b04eba72771897a9002e10eeccbf",
-      "migration": "namespace-only-20261110",
+      "source_sha256": "95da719c2186af3e11f5d3050d141a6ed205acba3deee47f736d8956ad1bb43b",
+      "rules_sha256": "e06b5b6b9bfdb10a23719ffc24a8a9370a0689802460beefb7136a0f9f4f0b95",
+      "revision": "sphingolipid-literature-20261110-r1",
+      "previous_index_sha256": "f13e817c0da6a269cedbd788c88db5174a45718ae218cd17f42a67edb03907ab",
+      "fresh_normalization": true,
       "index_format": 3,
       "block_size": 1024,
       "record_encoding": "fragment-columns-v3",
-      "record_count": 751876,
+      "record_count": 751877,
       "classes": [
         "AHexCer",
         "ASM",
@@ -76,6 +76,7 @@
         "LSM",
         "LacCer",
         "MIP2C",
+        "N,N-dimethylSo",
         "N-methylCAEP",
         "PE-Cer",
         "PG-Cer",
@@ -101,9 +102,9 @@
       "equivalent_candidate_version": 2,
       "search_plan_version": 1
     },
-    "source_bytes": 31899743,
-    "index_bytes": 46383104,
-    "index_sha256": "f13e817c0da6a269cedbd788c88db5174a45718ae218cd17f42a67edb03907ab",
+    "source_bytes": 29070151,
+    "index_bytes": 46407680,
+    "index_sha256": "118b6d0f200ad4391e96da7704bc5124d62787dcdf12353979d5015232811844",
     "raw_class_counts": {
       "AHexCer": 413592,
       "ASM": 7104,
@@ -179,18 +180,24 @@
       "HexSPB": 18,
       "KetoSPB": 1,
       "MIP2C": 134,
-      "SHexSPB": 35
+      "SHexSPB": 35,
+      "N,N-dimethylSo": 1
     },
-    "raw_content_sha256": "c1b538c7b0959d1df8853709d2a359557b5056b8bcfb4bf41dace77410a26a63"
+    "raw_content_sha256": "9f10a34a5b6894b8d2eda2927572ef7434038899a3115d715a3a483f2b1e5b9c",
+    "upstream_reference": {
+      "upstream_source_sha256": "b5ab2793190cd744350c002e1ad826b257e24593d5e82afe5164aacaa57f13a1",
+      "upstream_rules_sha256": "661b06f0dbd5f5366120efa057cdd3a57955b04eba72771897a9002e10eeccbf"
+    },
+    "revision": "sphingolipid-literature-20261110-r1"
   },
   "negative": {
     "metadata": {
       "version": 43,
       "source_sha256": "c05a165449ff9be6b5fc93a05ee619b2c141edde3256181bf5a84c5e58a4d4f9",
-      "rules_sha256": "d98a7d64a929e191031c55adcec4e9851d91a97ab4733cb57f2239f511a2ed87",
-      "upstream_source_sha256": "ae425b298d6cfcb99bb91e4b66e89d2dc77c458d47f1350d83e77299f965225a",
-      "upstream_rules_sha256": "661b06f0dbd5f5366120efa057cdd3a57955b04eba72771897a9002e10eeccbf",
-      "migration": "namespace-only-20261110",
+      "rules_sha256": "e06b5b6b9bfdb10a23719ffc24a8a9370a0689802460beefb7136a0f9f4f0b95",
+      "revision": "sphingolipid-literature-20261110-r1",
+      "previous_index_sha256": "964e8701400e674dc23e4695ee95207835b19145ac2ad5b45715ba3b3c7b899b",
+      "fresh_normalization": true,
       "index_format": 3,
       "block_size": 1024,
       "record_encoding": "fragment-columns-v3",
@@ -219,8 +226,8 @@
       "search_plan_version": 1
     },
     "source_bytes": 15319152,
-    "index_bytes": 23486464,
-    "index_sha256": "964e8701400e674dc23e4695ee95207835b19145ac2ad5b45715ba3b3c7b899b",
+    "index_bytes": 23515136,
+    "index_sha256": "b1b8dd5b814c34c19b8868387288924c3aff51593b927f97f0bda71cde4c5f9c",
     "raw_class_counts": {
       "AHexCer": 21604,
       "Cer": 234918,
@@ -236,6 +243,11 @@
       "SM": 13104,
       "GM3": 4461
     },
-    "raw_content_sha256": "ecc61dd2650b4df77de1a0cdc92186ad734c13167c19f8da94141db074c9d77c"
+    "raw_content_sha256": "ecc61dd2650b4df77de1a0cdc92186ad734c13167c19f8da94141db074c9d77c",
+    "upstream_reference": {
+      "upstream_source_sha256": "ae425b298d6cfcb99bb91e4b66e89d2dc77c458d47f1350d83e77299f965225a",
+      "upstream_rules_sha256": "661b06f0dbd5f5366120efa057cdd3a57955b04eba72771897a9002e10eeccbf"
+    },
+    "revision": "sphingolipid-literature-20261110-r1"
   }
 }

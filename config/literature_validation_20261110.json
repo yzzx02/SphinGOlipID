@@ -1,0 +1,71 @@
+{
+  "revision": "sphingolipid-literature-20261110-r1",
+  "version": "0.5.1",
+  "tests_passed": 1023,
+  "effective_rules_sha256": "e06b5b6b9bfdb10a23719ffc24a8a9370a0689802460beefb7136a0f9f4f0b95",
+  "scientific_engine_local_modifications": [
+    "src/sphingolipid_toolkit/_vendor/lipidgate/ms2/positive_catalog_legacy_sphingolipid.py"
+  ],
+  "unchanged_source_code_and_original_libraries_verified": true,
+  "original_frontend_unchanged": true,
+  "immutable_migration_manifest_unchanged": true,
+  "original_negative_msp_unchanged": true,
+  "fresh_index_and_manifest_metadata_equal": true,
+  "positive_normalized_records": 751877,
+  "negative_normalized_records": 348895,
+  "ms2_enabled_reference_type_names": 105,
+  "reference_only_type_names": [
+    "1-O-acetyl-Cer",
+    "1-O-acetyl-ω-linoleoyloxy-Cer",
+    "3-keto Cer",
+    "LM1",
+    "N,N,N-trimethylSo",
+    "N-methylSo",
+    "ketoSo"
+  ],
+  "indexed_equivalence_cases": 74,
+  "previous_control_results_scores_order_and_audit_equal": true,
+  "isolated_installation": {
+    "package_version": "0.5.1",
+    "upstream_application_imports_blocked": true,
+    "reviewed_dms_and_reference_corrections_verified": true,
+    "optional_openms_and_qt_imports_blocked": true,
+    "positive_and_negative_libraries": {
+      "+": {
+        "results": 1,
+        "scores": [
+          100.0
+        ]
+      },
+      "-": {
+        "results": 1,
+        "scores": [
+          100.0
+        ]
+      }
+    },
+    "reference_names": 79262,
+    "native_mzml_cli_passed": true
+  },
+  "measured_benchmark_recall_claimed": false,
+  "changed_lfs_assets": {
+    "ms2/sphingolipid_positive.msp.gz": {
+      "bytes": 29070151,
+      "sha256": "95da719c2186af3e11f5d3050d141a6ed205acba3deee47f736d8956ad1bb43b"
+    },
+    "ms2/sphingolipid_positive.sqlite": {
+      "bytes": 46407680,
+      "sha256": "118b6d0f200ad4391e96da7704bc5124d62787dcdf12353979d5015232811844"
+    },
+    "ms2/sphingolipid_negative.sqlite": {
+      "bytes": 23515136,
+      "sha256": "b1b8dd5b814c34c19b8868387288924c3aff51593b927f97f0bda71cde4c5f9c"
+    },
+    "reference_names.csv.gz": {
+      "bytes": 815892,
+      "sha256": "be02a86e3583fbf1a8aced041860de11e554ce4ccbc49624a18e4247fde5f30d"
+    }
+  },
+  "changed_lfs_bytes": 99808859,
+  "main_merged": false
+}

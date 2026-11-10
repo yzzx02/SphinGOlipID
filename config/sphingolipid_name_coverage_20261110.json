@@ -5,11 +5,11 @@
   "unique_names": 79262,
   "reference_types": 113,
   "coverage_status": {
-    "outside_current_eligible_library_grid": 50110,
-    "ms2_composition_covered": 22687,
-    "reference_name_formula_conflict": 531,
-    "reference_only_ambiguous_modification": 5838,
-    "reference_only_unverified_adduct": 95,
+    "outside_current_eligible_library_grid": 50204,
+    "ms2_composition_covered": 22688,
+    "reference_only_verified_composition_unresolved_linkage": 531,
+    "reference_only_ambiguous_modification": 5743,
+    "reference_only_insufficient_structural_signature": 95,
     "not_a_sphingolipid": 1
   },
   "by_reference_class": {
@@ -275,7 +275,7 @@
       "ms2_composition_covered": 204
     },
     "LM1": {
-      "reference_name_formula_conflict": 531
+      "reference_only_verified_composition_unresolved_linkage": 531
     },
     "LacCer": {
       "outside_current_eligible_library_grid": 2736,
@@ -336,10 +336,11 @@
       "ms2_composition_covered": 204
     },
     "N,N,N-trimethylSo": {
-      "reference_only_unverified_adduct": 95
+      "reference_only_insufficient_structural_signature": 95
     },
     "N,N-dimethylSo": {
-      "reference_only_ambiguous_modification": 95
+      "outside_current_eligible_library_grid": 94,
+      "ms2_composition_covered": 1
     },
     "N-methylCAEP": {
       "outside_current_eligible_library_grid": 303,
@@ -455,9 +456,9 @@
       "ms2_composition_covered": 299
     }
   },
-  "ms2_coverage_library_source_sha256": "b5ab2793190cd744350c002e1ad826b257e24593d5e82afe5164aacaa57f13a1",
-  "rules_sha256": "661b06f0dbd5f5366120efa057cdd3a57955b04eba72771897a9002e10eeccbf",
-  "asset_sha256": "c412ca910c34fa69e9fdbce8f3817c2e732acf7d3b56a22dc2888a5b5eb63d39",
-  "asset_bytes": 810934,
+  "ms2_coverage_library_source_sha256": "95da719c2186af3e11f5d3050d141a6ed205acba3deee47f736d8956ad1bb43b",
+  "rules_sha256": "e06b5b6b9bfdb10a23719ffc24a8a9370a0689802460beefb7136a0f9f4f0b95",
+  "asset_sha256": "be02a86e3583fbf1a8aced041860de11e554ce4ccbc49624a18e4247fde5f30d",
+  "asset_bytes": 815892,
   "coverage_definition": "Class/subtype and precursor composition within 10 ppm; theoretical availability, not measured recall or unique structure confirmation."
 }
