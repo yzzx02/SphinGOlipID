@@ -3,6 +3,10 @@ import gzip
 import hashlib
 import json
 from pathlib import Path
+import shutil
+from tempfile import TemporaryDirectory
+
+from openpyxl import load_workbook
 
 from .io_utils import write_excel_atomic
 
@@ -41,3 +45,95 @@ def write_identifications(data,path):
             created.unlink(missing_ok=True)
         raise
     return path
+
+
+def _file_digest(path: Path) -> bytes:
+    digest = hashlib.sha256()
+    with path.open('rb') as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b''):
+            digest.update(block)
+    return digest.digest()
+
+
+def copy_identification_bundle(source: str | Path, destination: str | Path) -> Path:
+    """Save all worksheets and referenced evidence, publishing the XLSX last.
+
+    Safe relative references keep the workbook byte-for-byte intact. Absolute
+    references or references outside the destination folder are localized;
+    only those reference cells are changed. Existing unequal evidence files
+    are never overwritten, and a failed save leaves the previous XLSX intact.
+    """
+    source, destination = Path(source), Path(destination)
+    if source.resolve() == destination.resolve():
+        return destination
+    root = destination.parent.resolve()
+    evidence = {}
+    digests = {}
+    rebases = []
+    workbook = load_workbook(source, read_only=True)
+    try:
+        for sheet in workbook.worksheets:
+            rows = sheet.iter_rows()
+            header = next(rows, ())
+            columns = [index for index, cell in enumerate(header) if cell.value == 'evidence_file']
+            if not columns:
+                continue
+            for row in rows:
+                for column in columns:
+                    cell = row[column]
+                    if cell.value is None or not str(cell.value).strip():
+                        continue
+                    reference = Path(str(cell.value))
+                    origin = (source.parent / reference).resolve()
+                    if not origin.is_file():
+                        raise FileNotFoundError(f'缺少碎片证据文件：{origin}')
+                    if origin not in digests:
+                        digests[origin] = _file_digest(origin)
+                    digest = digests[origin]
+                    target = (root / reference).resolve()
+                    if reference.is_absolute() or not target.is_relative_to(root):
+                        target = root / f'ms2-evidence-{digest.hex()[:16]}.json.gz'
+                        rebases.append((sheet.title, cell.coordinate, target.name))
+                    if target == destination.resolve():
+                        raise ValueError('结果文件不能覆盖其碎片证据文件。')
+                    if target in evidence and evidence[target][1] != digest:
+                        raise FileExistsError(f'碎片证据文件名称冲突：{target}')
+                    if target.exists():
+                        if target not in digests:
+                            digests[target] = _file_digest(target)
+                        if digests[target] != digest:
+                            raise FileExistsError(f'已有不同内容的碎片证据文件，未覆盖：{target}')
+                    evidence[target] = (origin, digest)
+    finally:
+        workbook.close()
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    created = []
+    try:
+        with TemporaryDirectory(prefix='.sphingolipid_export_', dir=destination.parent) as temporary:
+            staged = Path(temporary) / destination.name
+            shutil.copy2(source, staged)
+            if rebases:
+                workbook = load_workbook(staged)
+                try:
+                    for sheet, coordinate, reference in rebases:
+                        workbook[sheet][coordinate] = reference
+                    workbook.save(staged)
+                finally:
+                    workbook.close()
+            for target, (origin, digest) in evidence.items():
+                if target.exists():
+                    if _file_digest(target) != digest:
+                        raise FileExistsError(f'碎片证据文件在保存期间发生冲突：{target}')
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with origin.open('rb') as reader, target.open('xb') as writer:
+                    created.append(target)
+                    shutil.copyfileobj(reader, writer)
+                shutil.copystat(origin, target)
+            staged.replace(destination)
+    except BaseException:
+        for target in created:
+            target.unlink(missing_ok=True)
+        raise
+    return destination

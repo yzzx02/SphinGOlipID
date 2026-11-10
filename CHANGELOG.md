@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Use the displayed 0–100 total-score scale for GUI result filtering, including
+  current total-score-only workbooks and read-only aliases for older results.
+- Save complete result bundles with external MS2 evidence and all worksheets;
+  retain existing files when evidence is missing, conflicting or a save fails.
+- Preserve the existing Tk interface and all scientific rules, libraries,
+  gates, candidate ranking and score values.
+
 ## 0.5.1 — 2026-11-10
 
 - Add only the native-CID-verified d18:1 DMS composition with a two-HG gate including 110.0964, reusing HG/Other 60/40.

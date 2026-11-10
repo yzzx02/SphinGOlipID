@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import math
 import queue
-import shutil
 import threading
 import tkinter as tk
 from dataclasses import dataclass
@@ -18,6 +17,7 @@ import pandas as pd
 
 from .config import SphinGOlipIDConfig
 from .ms2_pipeline import run_batch
+from .result_writer import copy_identification_bundle
 from .scoring import add_standard_score_columns
 
 
@@ -35,12 +35,12 @@ PARAMETERS = (
     ("top_n", "每个前体保留 Top-N", 1, 1000, 1, int),
 )
 NAME_COLUMNS = ("lipid_name", "注释", "name", "annotation", "Lipid")
-SCORE_COLUMNS = ("ms2_match_score", "匹配度分数")
+SCORE_COLUMNS = ("total_score", "ms2_match_score", "匹配度分数")
 RESULT_FIELDS = (
     (("lipid_name", "注释", "name", "annotation"), "脂质名称", 240),
     (("observed_mz", "target"), "前体 m/z", 110),
     (("observed_rt", "RT"), "保留时间 (min)", 130),
-    (("total_score", "ms2_match_score", "匹配度分数"), "MS2 得分", 100),
+    (("total_score", "ms2_match_score", "匹配度分数"), "MS2 总分 (0–100)", 150),
     (("rank",), "候选排名", 90),
     (("matched_fragment_count",), "匹配碎片数", 110),
     (("signal_intensity", "Abund"), "信号强度", 120),
@@ -102,7 +102,7 @@ def filter_result_rows(
     sort_column: str | None = None,
     descending: bool = False,
 ) -> pd.DataFrame:
-    """Filter/sort without changing row identities used by the detail pane."""
+    """Use 0–100 display scores without changing scores or row identities."""
     view = frame
     if query.strip():
         columns = [column for column in NAME_COLUMNS if column in view.columns] or list(view.columns)
@@ -117,6 +117,8 @@ def filter_result_rows(
         if column is None:
             raise ValueError("当前结果没有 MS2 得分列，无法按得分筛选。")
         scores = pd.to_numeric(view[column], errors="coerce")
+        if column != "total_score":
+            scores = scores * 100
         view = view.loc[scores >= min_score]
     if sort_column in view.columns:
         values = view[sort_column]
@@ -332,9 +334,9 @@ class SphinGOlipIDApp:
         ttk.Label(filters, text="脂质名称").pack(side=tk.LEFT)
         self.search_entry = ttk.Entry(filters, textvariable=self.search_var, width=25)
         self.search_entry.pack(side=tk.LEFT, padx=(8, 18))
-        ttk.Label(filters, text="最低得分").pack(side=tk.LEFT)
+        ttk.Label(filters, text="最低总分 (0–100)").pack(side=tk.LEFT)
         self.score_filter_entry = ttk.Spinbox(filters, textvariable=self.score_filter_var,
-                                             from_=0, to=1, increment=0.05, width=7, state="disabled")
+                                             from_=0, to=100, increment=5, width=7, state="disabled")
         self.score_filter_entry.pack(side=tk.LEFT, padx=8)
         ttk.Button(filters, text="重置筛选", command=self._reset_filters).pack(side=tk.LEFT, padx=8)
         ttk.Label(filters, textvariable=self.result_summary, style="Muted.TLabel").pack(side=tk.RIGHT)
@@ -591,6 +593,11 @@ class SphinGOlipIDApp:
     def _load_result_table(self, path: Path) -> bool:
         try:
             frame = add_standard_score_columns(pd.read_excel(path))
+            if "total_score" not in frame:
+                legacy = next((column for column in SCORE_COLUMNS[1:] if column in frame), None)
+                if legacy is not None:
+                    # A view alias only: never rewrite the loaded workbook.
+                    frame["total_score"] = pd.to_numeric(frame[legacy], errors="coerce") * 100
         except Exception as exc:
             messagebox.showerror("打开失败", str(exc), parent=self.root)
             return False
@@ -644,8 +651,8 @@ class SphinGOlipIDApp:
                 minimum = float(text) if text else None
             except ValueError as exc:
                 raise ValueError("请输入有效的最低得分，留空显示全部得分。") from exc
-            if minimum is not None and (not math.isfinite(minimum) or not 0 <= minimum <= 1):
-                raise ValueError("筛选得分须在 0 到 1 之间，留空显示全部得分。")
+            if minimum is not None and (not math.isfinite(minimum) or not 0 <= minimum <= 100):
+                raise ValueError("筛选总分须在 0 到 100 之间，留空显示全部得分。")
             view = filter_result_rows(self.result_df, self.search_var.get(), minimum,
                                       self.sort_column, self.sort_descending)
         except ValueError as exc:
@@ -702,8 +709,7 @@ class SphinGOlipIDApp:
         if not path:
             return
         try:
-            if Path(path).resolve() != self.current_result.resolve():
-                shutil.copy2(self.current_result, path)
+            copy_identification_bundle(self.current_result, Path(path))
             self.run_status.set(f"完整结果已另存到：{path}")
         except Exception as exc:
             messagebox.showerror("保存失败", str(exc), parent=self.root)

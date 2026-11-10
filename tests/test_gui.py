@@ -1,5 +1,7 @@
 """Behavior checks for GUI parameter wiring, result review, and run lifecycle."""
 
+import gzip
+import json
 import threading
 import time
 import tkinter as tk
@@ -9,6 +11,7 @@ import pytest
 
 from sphingolipid_toolkit import gui
 from sphingolipid_toolkit.config import SphinGOlipIDConfig
+from sphingolipid_toolkit.result_writer import write_identifications
 
 
 def parameter_values(**changes):
@@ -46,7 +49,7 @@ def test_result_filter_uses_literal_names_numeric_scores_and_original_rows():
         "rank": ["10", "2", None, "1"],
     }, index=[12, 25, 30, 45])
     before = frame.copy(deep=True)
-    filtered = gui.filter_result_rows(frame, "cer(d18:", 0.5)
+    filtered = gui.filter_result_rows(frame, "cer(d18:", 50)
     assert list(filtered.index) == [12]
     ordered = gui.filter_result_rows(frame, sort_column="rank")
     assert list(ordered.index) == [45, 25, 12, 30]
@@ -55,10 +58,10 @@ def test_result_filter_uses_literal_names_numeric_scores_and_original_rows():
 
 def test_legacy_result_columns_and_empty_filter():
     frame = pd.DataFrame({"注释": ["Cer", "SM"], "匹配度分数": [0.35, 0.8]})
-    assert list(gui.filter_result_rows(frame, "cer", 0.35).index) == [0]
+    assert list(gui.filter_result_rows(frame, "cer", 35).index) == [0]
     assert gui.filter_result_rows(frame, "absent").empty
     with pytest.raises(ValueError, match="得分列"):
-        gui.filter_result_rows(pd.DataFrame({"name": ["Cer"]}), min_score=0.5)
+        gui.filter_result_rows(pd.DataFrame({"name": ["Cer"]}), min_score=50)
 
 
 @pytest.fixture(scope="module")
@@ -102,7 +105,7 @@ def test_sorted_filtered_selection_and_export_preserve_original_workbook(app, tm
     result_workbook(source)
     assert app._load_result_table(source)
     app.search_var.set("cer(")
-    app.score_filter_var.set("0.7")
+    app.score_filter_var.set("70")
     app._sort_results("ms2_match_score")
     assert app.result_tree.get_children() == ("2",)
     app.result_tree.selection_set("2")
@@ -296,3 +299,104 @@ def test_worker_start_failure_restores_gui_controls(app, tmp_path, monkeypatch):
     assert app.run_button.instate(["!disabled"])
     assert all(control.instate(["!disabled"]) for control in app.input_controls)
     assert "thread unavailable" in errors[0]
+
+
+def test_current_total_score_uses_same_percent_scale_for_display_and_filter(app, tmp_path):
+    source = tmp_path / "current.xlsx"
+    frame = pd.DataFrame({"lipid_name": ["Cer A", "Cer B"],
+                          "total_score": [43.5, 82.25], "rank": [1, 2],
+                          "matched_fragment_count": [3, 5]})
+    frame.to_excel(source, index=False)
+    original = source.read_bytes()
+    assert app._load_result_table(source)
+    assert app.score_filter_entry.instate(["!disabled"])
+    assert float(app.score_filter_entry.cget("to")) == 100
+    app.score_filter_var.set("70")
+    app._apply_filters()
+    assert app.result_tree.get_children() == ("1",)
+    assert app.result_tree.set("1", "total_score") == "82.25"
+    assert app.result_df["rank"].tolist() == [1, 2]
+    assert source.read_bytes() == original
+
+
+def test_legacy_scores_display_as_percent_without_rewriting_original(app, tmp_path):
+    source = tmp_path / "legacy-score.xlsx"
+    result_workbook(source)
+    original = source.read_bytes()
+    assert app._load_result_table(source)
+    assert app.result_tree.set("0", "total_score") == "60.0"
+    app.score_filter_var.set("70")
+    app._apply_filters()
+    assert app.result_tree.get_children() == ("1", "2")
+    assert source.read_bytes() == original
+
+
+@pytest.mark.parametrize("value", ["101", "nan", "not a score"])
+def test_invalid_score_filter_keeps_previous_view_and_explains_error(app, tmp_path, value):
+    source = tmp_path / "result.xlsx"
+    result_workbook(source)
+    app._load_result_table(source)
+    previous = app.result_tree.get_children()
+    app.score_filter_var.set(value)
+    app._apply_filters()
+    assert app.result_tree.get_children() == previous
+    assert "有效" in app.filter_message.get() or "100" in app.filter_message.get()
+
+
+def test_current_total_score_takes_precedence_over_legacy_alias():
+    frame = pd.DataFrame({"total_score": [82.5, 30.0], "ms2_match_score": [0.2, 0.9]})
+    original = frame.copy(deep=True)
+    assert gui.filter_result_rows(frame, min_score=70).index.tolist() == [0]
+    pd.testing.assert_frame_equal(frame, original)
+
+
+def external_result(tmp_path):
+    source_dir = tmp_path / "original"
+    source_dir.mkdir()
+    source = source_dir / "result.xlsx"
+    evidence = json.dumps({"matches": [[264.2686, 99.5]] * 3000}, separators=(",", ":"))
+    write_identifications(pd.DataFrame({"lipid_name": ["Cer(d18:1/24:0)"],
+        "total_score": [88.1234], "rank": [1], "ms2_evidence_json": [evidence]}), source)
+    with pd.ExcelWriter(source, mode="a", engine="openpyxl") as writer:
+        pd.DataFrame({"setting": ["original metadata"]}).to_excel(writer, sheet_name="metadata", index=False)
+    exported = pd.read_excel(source)
+    return source, exported.loc[0, "evidence_file"], exported.loc[0, "evidence_sha256"], evidence
+
+
+def test_save_as_copies_complete_external_evidence_and_all_sheets(app, tmp_path, monkeypatch):
+    source, sidecar, key, evidence = external_result(tmp_path)
+    source_bytes = source.read_bytes()
+    destination = tmp_path / "saved" / "result.xlsx"
+    destination.parent.mkdir()
+    assert app._load_result_table(source)
+    monkeypatch.setattr(gui.filedialog, "asksaveasfilename", lambda **kwargs: str(destination))
+    app._save_current_result_as()
+    assert destination.read_bytes() == source_bytes
+    result = pd.read_excel(destination)
+    evidence_path = destination.parent / result.loc[0, "evidence_file"]
+    assert evidence_path.is_file()
+    assert json.loads(gzip.decompress(evidence_path.read_bytes()))[key] == evidence
+    assert evidence_path.read_bytes() == (source.parent / sidecar).read_bytes()
+    assert pd.read_excel(destination, sheet_name="metadata").setting.tolist() == ["original metadata"]
+    assert result.total_score.tolist() == [88.1234] and result["rank"].tolist() == [1]
+
+
+@pytest.mark.parametrize("failure", ["missing", "conflict"])
+def test_incomplete_save_as_keeps_existing_workbook_and_evidence(app, tmp_path, monkeypatch, failure):
+    source, sidecar, _key, _evidence = external_result(tmp_path)
+    destination = tmp_path / "saved" / "result.xlsx"
+    destination.parent.mkdir()
+    destination.write_bytes(b"previous result")
+    if failure == "missing":
+        (source.parent / sidecar).unlink()
+    else:
+        (destination.parent / sidecar).write_bytes(b"different evidence; do not overwrite")
+    assert app._load_result_table(source)
+    errors = []
+    monkeypatch.setattr(gui.messagebox, "showerror", lambda *args, **kwargs: errors.append(args))
+    monkeypatch.setattr(gui.filedialog, "asksaveasfilename", lambda **kwargs: str(destination))
+    app._save_current_result_as()
+    assert errors
+    assert destination.read_bytes() == b"previous result"
+    if failure == "conflict":
+        assert (destination.parent / sidecar).read_bytes() == b"different evidence; do not overwrite"
