@@ -12,3 +12,6 @@ tests/output/
 htmlcov/
 build/
 dist/
+
+# Temporary library-build spools are never source assets.
+src/sphingolipid_toolkit/data/ms2/*_stage_*/

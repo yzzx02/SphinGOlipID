@@ -1,0 +1,228 @@
+{
+  "AHexCer": [
+    "ω-linoleoyloxy-GlcCer"
+  ],
+  "Ac1HexCer": [
+    "FMC-1",
+    "FMC-2"
+  ],
+  "Ac2HexCer": [
+    "FMC-3",
+    "FMC-4"
+  ],
+  "Ac5HexCer": [
+    "FMC-5",
+    "FMC-6"
+  ],
+  "Ac6HexCer": [
+    "FMC-7"
+  ],
+  "CAEP": [
+    "CAEP"
+  ],
+  "Cer": [
+    "Cer",
+    "ω-linoleoyloxy-Cer",
+    "ω-linoleoyloxy-DHCer"
+  ],
+  "Cer1P": [
+    "CerP",
+    "DHCerP"
+  ],
+  "GM1": [
+    "GM1"
+  ],
+  "GM2": [
+    "GM2"
+  ],
+  "GM3": [
+    "GM3"
+  ],
+  "Gb4": [
+    "GA1",
+    "GalGalNAcGalGlcCer",
+    "GalGlcNAcGalGlcCer",
+    "Globoside I",
+    "nLc4Cer"
+  ],
+  "Hex-IPC": [
+    "MIPC"
+  ],
+  "Hex2HexNAc2Cer": [
+    "GlcNAcGalNAcGalGlcCer"
+  ],
+  "Hex2HexNAc2FucCer": [
+    "CPS"
+  ],
+  "Hex2HexNAc3FucCer": [
+    "CHS"
+  ],
+  "Hex2HexNAcCer": [
+    "GA2",
+    "GlcNAcManGlcCer",
+    "Lc3Cer"
+  ],
+  "Hex2HexNAcKDNCer": [
+    "KDN-GM2"
+  ],
+  "Hex2KDNCer": [
+    "KDN-GM3"
+  ],
+  "Hex2NeuGcCer": [
+    "GM3 NeuGc"
+  ],
+  "Hex3Cer": [
+    "Gb3",
+    "Isoglobotriglycosylceramide",
+    "ManManGlcCer"
+  ],
+  "Hex3FucCer": [
+    "FucGalGalGlcCer"
+  ],
+  "Hex3HexNAc2Cer": [
+    "Forssman antigen",
+    "GalNAcGalGalNAcGalGlcCer",
+    "GlcNAcGalGalNAcGalGlcCer",
+    "GlcNAcGalGlcNAcGalGlcCer"
+  ],
+  "Hex3HexNAc2Fuc2Cer": [
+    "Aleb"
+  ],
+  "Hex3HexNAc2FucCer": [
+    "FucGalNAcGalGalNAcGalGlcCer",
+    "FucGlcNAcGalGalNAcGalGlcCer",
+    "FucGlcNAcGalGlcNAcGalGlcCer",
+    "type I A antigen"
+  ],
+  "Hex3HexNAcFuc2Cer": [
+    "Leb",
+    "Ley-6"
+  ],
+  "Hex3HexNAcFucCer": [
+    "FucGalGalNAcGalGlcCer",
+    "FucGlcNAcGalGalGlcCer",
+    "Lex-5",
+    "type I H antigen"
+  ],
+  "Hex3HexNAcKDNCer": [
+    "KDN-GM1"
+  ],
+  "Hex3SPB": [
+    "Gb3So"
+  ],
+  "Hex4Cer": [
+    "GalGalGalGlcCer"
+  ],
+  "Hex4FucCer": [
+    "FucGalGalGalGlcCer"
+  ],
+  "Hex4HexNAc2Cer": [
+    "GalGalNAcGalGalNAcGalGlcCer",
+    "GalGlcNAcGalGalNAcGalGlcCer",
+    "GalGlcNAcGalGlcNAcGalGlcCer",
+    "IV3-nLcOse4"
+  ],
+  "Hex4HexNAc2Fuc2Cer": [
+    "Lea-X",
+    "Ley-8"
+  ],
+  "Hex4HexNAc2Fuc3Cer": [
+    "Ley-A-9"
+  ],
+  "Hex4HexNAc2FucCer": [
+    "FucGalGlcNAcGalGlcNAcGalGlcCer",
+    "GalGalNAcFucGalGlcNAcGalGlcCer",
+    "Lex-7",
+    "type II H antigen",
+    "type IV A antigen"
+  ],
+  "Hex4HexNAc3Cer": [
+    "GalGlcNAcGlcNAcGalGlcNAcGalGlcCer",
+    "GalNAcGalGlcNAcGalGlcNAcGalGlcCer"
+  ],
+  "Hex4HexNAc3Fuc2Cer": [
+    "type III A antigen"
+  ],
+  "Hex4HexNAc3FucCer": [
+    "type II A antigen"
+  ],
+  "Hex4HexNAcCer": [
+    "GalGalGlcNAcGalGlcCer",
+    "GalGlcNAcGalGalGlcCer",
+    "SSEA-3 antigen"
+  ],
+  "Hex4HexNAcFuc2Cer": [
+    "Bleb"
+  ],
+  "Hex4HexNAcFucCer": [
+    "GalFucGalGalNAcGalGlcCer",
+    "type I B antigen",
+    "type IV H"
+  ],
+  "Hex5Cer": [
+    "GalGalGalGalGlcCer"
+  ],
+  "Hex5HexNAc2FucCer": [
+    "globo-Lex-9",
+    "type II B antigen"
+  ],
+  "Hex5HexNAc3Cer": [
+    "I antigen"
+  ],
+  "Hex5HexNAc3FucCer": [
+    "Lex-9"
+  ],
+  "Hex5HexNAcFucCer": [
+    "type IV B antigen"
+  ],
+  "HexCer": [
+    "GalCer",
+    "GlcCer"
+  ],
+  "HexNeuAcCer": [
+    "GM4"
+  ],
+  "HexSPB": [
+    "GalSo",
+    "GlcSo"
+  ],
+  "KetoSPB": [
+    "ketoSa"
+  ],
+  "LSM": [
+    "Lyso-SM"
+  ],
+  "LacCer": [
+    "GalGalCer",
+    "LacCer"
+  ],
+  "MIP2C": [
+    "M(IP)2C"
+  ],
+  "N-methylCAEP": [
+    "N-methylCAEP"
+  ],
+  "PE-Cer": [
+    "PECer"
+  ],
+  "PG-Cer": [
+    "PGCer"
+  ],
+  "PI-Cer": [
+    "PICer"
+  ],
+  "S1P": [
+    "Sa1P",
+    "So1P"
+  ],
+  "SHexSPB": [
+    "Lyso-sulfo"
+  ],
+  "SM": [
+    "SM"
+  ],
+  "SPB": [
+    "Sa",
+    "So"
+  ]
+}

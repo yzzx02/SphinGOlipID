@@ -1,0 +1,51 @@
+{
+  "revision": "sphingolipid-engine-migration-20261110",
+  "version": "0.4.0",
+  "frontend": "Existing SphinGOlipID frontend retained; only backend calls and parameter/result fields adapted",
+  "lipidgate_frontend_migrated": false,
+  "source_full_tests_passed": 2299,
+  "source_subtests_passed": 2670,
+  "standalone_full_tests_passed": 1075,
+  "indexed_search_equivalence": {
+    "cases": 74,
+    "results_scores_order_and_audit_equal": true,
+    "inputs": "Synthetic library-derived spectra at 20 ppm and 0.3 Da; not measured recall"
+  },
+  "isolated_wheel_verification": {
+    "package_version": "0.4.0",
+    "upstream_application_imports_blocked": true,
+    "optional_openms_and_qt_imports_blocked": true,
+    "positive_and_negative_libraries": {
+      "+": {
+        "results": 1,
+        "scores": [
+          100.0
+        ]
+      },
+      "-": {
+        "results": 1,
+        "scores": [
+          100.0
+        ]
+      }
+    },
+    "reference_names": 79262,
+    "native_mzml_cli_passed": true
+  },
+  "retained_sphingolipid_reference_type_names": 112,
+  "ms2_enabled_reference_type_names": 104,
+  "reference_only_types": [
+    "1-O-acetyl-Cer",
+    "1-O-acetyl-ω-linoleoyloxy-Cer",
+    "3-keto Cer",
+    "LM1",
+    "N,N,N-trimethylSo",
+    "N,N-dimethylSo",
+    "N-methylSo",
+    "ketoSo"
+  ],
+  "ms2_enabled_means": "The class/family has eligible library records; does not imply every historical chain combination or unique isomer is covered",
+  "independent_library_bytes": 117899397,
+  "source_baseline_preserved": "codex/sphingolipid-hg2-b2-baseline-20261109",
+  "main_merged": false
+}

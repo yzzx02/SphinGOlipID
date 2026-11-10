@@ -1,0 +1,757 @@
+{
+  "revision": "sphingolipid_catalog_migration_20261110",
+  "fixed_baseline": "codex/sphingolipid-hg2-b2-baseline-20261109",
+  "library": "libraries/ms2/sphingolipid_positive.msp.gz",
+  "source_sha256": "b5ab2793190cd744350c002e1ad826b257e24593d5e82afe5164aacaa57f13a1",
+  "source_bytes": 48937233,
+  "rules_sha256": "661b06f0dbd5f5366120efa057cdd3a57955b04eba72771897a9002e10eeccbf",
+  "raw_records": 1807359,
+  "normalized_records": 1815094,
+  "original_prefix_sha256": "9c779f73e36640e6864e1f334420e587de4e5dd03b17a94b62b38c255070de61",
+  "original_prefix_records": 1798871,
+  "original_blocks_and_order_unchanged": true,
+  "added_records": 8488,
+  "added_families": 44,
+  "added_by_class": {
+    "Ac1HexCer": 338,
+    "Ac2HexCer": 338,
+    "Ac5HexCer": 338,
+    "Ac6HexCer": 134,
+    "CAEP": 268,
+    "Hex2HexNAc2Cer": 204,
+    "Hex2HexNAc2FucCer": 204,
+    "Hex2HexNAc3FucCer": 204,
+    "Hex2HexNAcCer": 204,
+    "Hex2HexNAcKDNCer": 204,
+    "Hex2KDNCer": 204,
+    "Hex2NeuGcCer": 204,
+    "Hex3FucCer": 204,
+    "Hex3HexNAc2Cer": 204,
+    "Hex3HexNAc2Fuc2Cer": 204,
+    "Hex3HexNAc2FucCer": 204,
+    "Hex3HexNAcFuc2Cer": 204,
+    "Hex3HexNAcFucCer": 204,
+    "Hex3HexNAcKDNCer": 204,
+    "Hex3SPB": 18,
+    "Hex4Cer": 204,
+    "Hex4FucCer": 204,
+    "Hex4HexNAc2Cer": 204,
+    "Hex4HexNAc2Fuc2Cer": 204,
+    "Hex4HexNAc2Fuc3Cer": 204,
+    "Hex4HexNAc2FucCer": 204,
+    "Hex4HexNAc3Cer": 204,
+    "Hex4HexNAc3Fuc2Cer": 204,
+    "Hex4HexNAc3FucCer": 204,
+    "Hex4HexNAcCer": 204,
+    "Hex4HexNAcFuc2Cer": 204,
+    "Hex4HexNAcFucCer": 204,
+    "Hex5Cer": 204,
+    "Hex5HexNAc2FucCer": 204,
+    "Hex5HexNAc3Cer": 204,
+    "Hex5HexNAc3FucCer": 204,
+    "Hex5HexNAcFucCer": 204,
+    "HexNeuAcCer": 204,
+    "HexSPB": 18,
+    "KetoSPB": 1,
+    "MIP2C": 134,
+    "N-methylCAEP": 169,
+    "PG-Cer": 169,
+    "SHexSPB": 35
+  },
+  "catalog_sha256": "227f76c55b6d2cecfb3f535620ec81fd2c1c0c0cf63367d70a748c3f2d9aafb0",
+  "catalog_role": "type/name crosswalk only; current curated library and chain limits remain authoritative",
+  "chain_limit_curation": {
+    "original_records": 1807359,
+    "retained_records": 1807359,
+    "removed_records": 0,
+    "removed_records_by_class_adduct": {},
+    "removal_reason_counts": {},
+    "removed_examples": [],
+    "supported_sodium_totals": {
+      "Cer": 759,
+      "Cer1P": 375
+    },
+    "retained_records_sha256": "508e42dd3b758035d57b9899a8e856ad22297ae547b0d25a0a0509f020f0040d",
+    "retained_records_content_and_order_unchanged": true,
+    "source_before_sha256": "060b8456c79e135bc20df9a22cc32468648d9acd03bb2d2e735a170edc7bb481",
+    "source_sha256": "b5ab2793190cd744350c002e1ad826b257e24593d5e82afe5164aacaa57f13a1",
+    "source_bytes": 48937233
+  },
+  "index_verification": {
+    "metadata": {
+      "version": 43,
+      "source_sha256": "b5ab2793190cd744350c002e1ad826b257e24593d5e82afe5164aacaa57f13a1",
+      "rules_sha256": "661b06f0dbd5f5366120efa057cdd3a57955b04eba72771897a9002e10eeccbf",
+      "normalized_from_verified_prefix_sha256": "9c779f73e36640e6864e1f334420e587de4e5dd03b17a94b62b38c255070de61",
+      "normalized_from_same_rules_index_sha256": "444be45f19287332e018f042dc5847e14a7d084c28d84e4161698962f5d5fd55",
+      "freshly_normalized_appended_msp_sha256": "d621bb68aa3ad752048109cd7f07562c832f805d0f7a70154da2eff4ba0d6043",
+      "index_format": 3,
+      "block_size": 1024,
+      "record_encoding": "fragment-columns-v3",
+      "record_count": 1815094,
+      "classes": [
+        "ADGGA",
+        "AHexCer",
+        "APCS",
+        "ASM",
+        "Ac1HexCer",
+        "Ac2HexCer",
+        "Ac5HexCer",
+        "Ac6HexCer",
+        "Am-LPS",
+        "Am-PS",
+        "BMP",
+        "BRSE",
+        "CAEP",
+        "CAR",
+        "CASE",
+        "CDP-DG",
+        "CE",
+        "CE-PE",
+        "CL",
+        "Cer",
+        "Cer1P",
+        "CoQ1",
+        "CoQ10",
+        "CoQ2",
+        "CoQ3",
+        "CoQ4",
+        "CoQ5",
+        "CoQ6",
+        "CoQ7",
+        "CoQ8",
+        "CoQ9",
+        "DG",
+        "DG-O",
+        "DGCC",
+        "DGDG",
+        "DGDG-O",
+        "DGGA",
+        "DGTS",
+        "DMPE",
+        "GD1",
+        "GD1a",
+        "GD1b",
+        "GD2",
+        "GD3",
+        "GM1",
+        "GM2",
+        "GM3",
+        "GPNAE",
+        "GQ1b",
+        "GT1",
+        "GT1b",
+        "Gal-Fuc-GD1",
+        "Gal-Fuc-GM1",
+        "Gb4",
+        "HBMP",
+        "Hex-IPC",
+        "Hex2HexNAc2Cer",
+        "Hex2HexNAc2FucCer",
+        "Hex2HexNAc3FucCer",
+        "Hex2HexNAcCer",
+        "Hex2HexNAcKDNCer",
+        "Hex2KDNCer",
+        "Hex2NeuGcCer",
+        "Hex3Cer",
+        "Hex3FucCer",
+        "Hex3HexNAc2Cer",
+        "Hex3HexNAc2Fuc2Cer",
+        "Hex3HexNAc2FucCer",
+        "Hex3HexNAcFuc2Cer",
+        "Hex3HexNAcFucCer",
+        "Hex3HexNAcKDNCer",
+        "Hex3SPB",
+        "Hex4Cer",
+        "Hex4FucCer",
+        "Hex4HexNAc2Cer",
+        "Hex4HexNAc2Fuc2Cer",
+        "Hex4HexNAc2Fuc3Cer",
+        "Hex4HexNAc2FucCer",
+        "Hex4HexNAc3Cer",
+        "Hex4HexNAc3Fuc2Cer",
+        "Hex4HexNAc3FucCer",
+        "Hex4HexNAcCer",
+        "Hex4HexNAcFuc2Cer",
+        "Hex4HexNAcFucCer",
+        "Hex5Cer",
+        "Hex5HexNAc2FucCer",
+        "Hex5HexNAc3Cer",
+        "Hex5HexNAc3FucCer",
+        "Hex5HexNAcFucCer",
+        "HexCer",
+        "HexNeuAcCer",
+        "HexSPB",
+        "KetoSPB",
+        "LCE-PE",
+        "LDGCC",
+        "LDGTS",
+        "LNAPE",
+        "LPA",
+        "LPA-O",
+        "LPC",
+        "LPC-O",
+        "LPE",
+        "LPE-O",
+        "LPE-P",
+        "LPG",
+        "LPG-O",
+        "LPI",
+        "LPI-O",
+        "LPS",
+        "LPS-O",
+        "LSM",
+        "LacCer",
+        "MG",
+        "MGDG",
+        "MGDG-O",
+        "MGMG",
+        "MIP2C",
+        "MLCL",
+        "MMPE",
+        "N-methylCAEP",
+        "NAAsp",
+        "NAE",
+        "NAGly",
+        "NAGlySer",
+        "NAOrn",
+        "NAPE",
+        "NAPS",
+        "OxPC",
+        "OxPE",
+        "OxTG",
+        "PA",
+        "PA-O",
+        "PC",
+        "PC-O",
+        "PC-P",
+        "PDPT",
+        "PE",
+        "PE-Cer",
+        "PE-O",
+        "PE-P",
+        "PG",
+        "PG-Cer",
+        "PG-O",
+        "PHEG",
+        "PI",
+        "PI-Cer",
+        "PI-O",
+        "PMeOH",
+        "PS",
+        "PS-O",
+        "PSC",
+        "PnE-P",
+        "S1P",
+        "SHexCer",
+        "SHexCer+O",
+        "SHexSPB",
+        "SL",
+        "SM",
+        "SPB",
+        "SQDG",
+        "TG",
+        "TG-EST",
+        "TG-O",
+        "VD"
+      ],
+      "adducts": [
+        "[M+2H-H2O]2+",
+        "[M+2H]2+",
+        "[M+2NH4]2+",
+        "[M+H+NH4]2+",
+        "[M+H-H2O]+",
+        "[M+H]+",
+        "[M+NH4]+",
+        "[M+Na]+"
+      ],
+      "equivalent_candidate_version": 2,
+      "search_plan_version": 1
+    },
+    "original_prefix_records": 1798871,
+    "fresh_appended_records": 8488,
+    "reused_same_code_prefix_and_derived_records": 1806606,
+    "all_source_ids_order_and_scientific_fields_verified": true,
+    "blockwise_roundtrip_verified": true,
+    "index_sha256": "c2cc91c2fec4fefac00168bac22ea64a3bd889162afa16496928a65c727cec29",
+    "inputs": {
+      "build\\prebuilt_libraries\\sphingolipid_positive.sqlite": "444be45f19287332e018f042dc5847e14a7d084c28d84e4161698962f5d5fd55",
+      "libraries\\ms2\\sphingolipid_positive.msp.gz": "490d6bf2f07fc1ec6ca1f566280ec8960156b8d641dd8156c4c416fdd53dc33a",
+      "build\\sphingolipid_migration_20261110\\branch_positive_before.msp.gz": "9c779f73e36640e6864e1f334420e587de4e5dd03b17a94b62b38c255070de61",
+      "build\\sphingolipid_migration_20261110\\curated_positive_metadata_final.msp.gz": "b5ab2793190cd744350c002e1ad826b257e24593d5e82afe5164aacaa57f13a1",
+      "build\\sphingolipid_migration_20261110\\catalog_suffix.msp.gz": "d621bb68aa3ad752048109cd7f07562c832f805d0f7a70154da2eff4ba0d6043"
+    }
+  },
+  "name_catalog": {
+    "source_sha256": "227f76c55b6d2cecfb3f535620ec81fd2c1c0c0cf63367d70a748c3f2d9aafb0",
+    "input_rows": 85710,
+    "unique_name_formula_rows": 79262,
+    "unique_names": 79262,
+    "reference_types": 113,
+    "coverage_status": {
+      "outside_current_eligible_library_grid": 50110,
+      "ms2_composition_covered": 22687,
+      "reference_name_formula_conflict": 531,
+      "reference_only_ambiguous_modification": 5838,
+      "reference_only_unverified_adduct": 95,
+      "not_a_sphingolipid": 1
+    },
+    "by_reference_class": {
+      "1-O-acetyl-Cer": {
+        "reference_only_ambiguous_modification": 1980
+      },
+      "1-O-acetyl-ω-linoleoyloxy-Cer": {
+        "reference_only_ambiguous_modification": 1980
+      },
+      "3-keto Cer": {
+        "reference_only_ambiguous_modification": 1593
+      },
+      "Aleb": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Bleb": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "CAEP": {
+        "outside_current_eligible_library_grid": 676,
+        "ms2_composition_covered": 268
+      },
+      "CHS": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "CPS": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Cer": {
+        "outside_current_eligible_library_grid": 5293,
+        "ms2_composition_covered": 2445
+      },
+      "CerP": {
+        "outside_current_eligible_library_grid": 748,
+        "ms2_composition_covered": 196
+      },
+      "DHCerP": {
+        "outside_current_eligible_library_grid": 380,
+        "ms2_composition_covered": 151
+      },
+      "FMC-1": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FMC-2": {
+        "outside_current_eligible_library_grid": 397,
+        "ms2_composition_covered": 134
+      },
+      "FMC-3": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FMC-4": {
+        "outside_current_eligible_library_grid": 397,
+        "ms2_composition_covered": 134
+      },
+      "FMC-5": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FMC-6": {
+        "outside_current_eligible_library_grid": 397,
+        "ms2_composition_covered": 134
+      },
+      "FMC-7": {
+        "outside_current_eligible_library_grid": 397,
+        "ms2_composition_covered": 134
+      },
+      "Forssman antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGalGalGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGalGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGalGlcNAcGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGalNAcGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGlcNAcGalGalGlcCer": {
+        "outside_current_eligible_library_grid": 397,
+        "ms2_composition_covered": 134
+      },
+      "FucGlcNAcGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "FucGlcNAcGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GA1": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GA2": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GM1": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GM2": {
+        "outside_current_eligible_library_grid": 408,
+        "ms2_composition_covered": 123
+      },
+      "GM3": {
+        "outside_current_eligible_library_grid": 408,
+        "ms2_composition_covered": 123
+      },
+      "GM3 NeuGc": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GM4": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalCer": {
+        "outside_current_eligible_library_grid": 2434,
+        "ms2_composition_covered": 752
+      },
+      "GalFucGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGalCer": {
+        "outside_current_eligible_library_grid": 381,
+        "ms2_composition_covered": 150
+      },
+      "GalGalGalGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGalGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGalNAcFucGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGalNAcGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGlcNAcGalGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGlcNAcGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGlcNAcGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalGlcNAcGlcNAcGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalNAcGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalNAcGalGlcNAcGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GalSo": {
+        "ms2_composition_covered": 18,
+        "outside_current_eligible_library_grid": 77
+      },
+      "Gb3": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Gb3So": {
+        "ms2_composition_covered": 18,
+        "outside_current_eligible_library_grid": 77
+      },
+      "GlcCer": {
+        "outside_current_eligible_library_grid": 2434,
+        "ms2_composition_covered": 752
+      },
+      "GlcNAcGalGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GlcNAcGalGlcNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GlcNAcGalNAcGalGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GlcNAcManGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "GlcSo": {
+        "ms2_composition_covered": 18,
+        "outside_current_eligible_library_grid": 77
+      },
+      "Globoside I": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "I antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "IV3-nLcOse4": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Isoglobotriglycosylceramide": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "KDN-GM1": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "KDN-GM2": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "KDN-GM3": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "LM1": {
+        "reference_name_formula_conflict": 531
+      },
+      "LacCer": {
+        "outside_current_eligible_library_grid": 2736,
+        "ms2_composition_covered": 450
+      },
+      "Lc3Cer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Lea-X": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Leb": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Lex-5": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Lex-7": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Lex-9": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Ley-6": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Ley-8": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Ley-A-9": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Lyso-SM": {
+        "outside_current_eligible_library_grid": 76,
+        "ms2_composition_covered": 38
+      },
+      "Lyso-sulfo": {
+        "ms2_composition_covered": 35,
+        "outside_current_eligible_library_grid": 79
+      },
+      "M(IP)2C": {
+        "outside_current_eligible_library_grid": 531
+      },
+      "MIPC": {
+        "outside_current_eligible_library_grid": 531
+      },
+      "ManManGlcCer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "N,N,N-trimethylSo": {
+        "reference_only_unverified_adduct": 95
+      },
+      "N,N-dimethylSo": {
+        "reference_only_ambiguous_modification": 95
+      },
+      "N-methylCAEP": {
+        "outside_current_eligible_library_grid": 303,
+        "ms2_composition_covered": 169
+      },
+      "N-methylSo": {
+        "reference_only_ambiguous_modification": 95
+      },
+      "PECer": {
+        "outside_current_eligible_library_grid": 1389,
+        "ms2_composition_covered": 204
+      },
+      "PGCer": {
+        "outside_current_eligible_library_grid": 303,
+        "ms2_composition_covered": 169
+      },
+      "PICer": {
+        "outside_current_eligible_library_grid": 1596,
+        "ms2_composition_covered": 528
+      },
+      "SM": {
+        "outside_current_eligible_library_grid": 1121,
+        "ms2_composition_covered": 472
+      },
+      "SSEA-3 antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "Sa": {
+        "ms2_composition_covered": 175,
+        "outside_current_eligible_library_grid": 401
+      },
+      "Sa1P": {
+        "outside_current_eligible_library_grid": 225,
+        "ms2_composition_covered": 3
+      },
+      "So": {
+        "ms2_composition_covered": 52,
+        "outside_current_eligible_library_grid": 233
+      },
+      "So1P": {
+        "outside_current_eligible_library_grid": 94,
+        "ms2_composition_covered": 1
+      },
+      "globo-Lex-9": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "ketoSa": {
+        "outside_current_eligible_library_grid": 113,
+        "ms2_composition_covered": 1
+      },
+      "ketoSo": {
+        "reference_only_ambiguous_modification": 95
+      },
+      "myriocin": {
+        "not_a_sphingolipid": 1
+      },
+      "nLc4Cer": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type I A antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type I B antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type I H antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type II A antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type II B antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type II H antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type III A antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type IV A antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type IV B antigen": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "type IV H": {
+        "outside_current_eligible_library_grid": 327,
+        "ms2_composition_covered": 204
+      },
+      "ω-linoleoyloxy-Cer": {
+        "outside_current_eligible_library_grid": 1334,
+        "ms2_composition_covered": 141
+      },
+      "ω-linoleoyloxy-DHCer": {
+        "outside_current_eligible_library_grid": 341,
+        "ms2_composition_covered": 190
+      },
+      "ω-linoleoyloxy-GlcCer": {
+        "outside_current_eligible_library_grid": 763,
+        "ms2_composition_covered": 299
+      }
+    },
+    "ms2_coverage_library_source_sha256": "b5ab2793190cd744350c002e1ad826b257e24593d5e82afe5164aacaa57f13a1",
+    "rules_sha256": "661b06f0dbd5f5366120efa057cdd3a57955b04eba72771897a9002e10eeccbf",
+    "asset_sha256": "c412ca910c34fa69e9fdbce8f3817c2e732acf7d3b56a22dc2888a5b5eb63d39",
+    "asset_bytes": 810934,
+    "coverage_definition": "Class/subtype and precursor composition within 10 ppm; theoretical availability, not measured recall or unique structure confirmation."
+  },
+  "original_libraries_sha256": {
+    "current_positive.msp.gz": "50383799b85fe3d706db01d36c00dfdf0e4a6399cf3d1bffa7398490ddfba8f3",
+    "current_negative.msp.gz": "ae425b298d6cfcb99bb91e4b66e89d2dc77c458d47f1350d83e77299f965225a"
+  },
+  "tests": {
+    "source_full_passed": 2299,
+    "source_subtests_passed": 2670,
+    "standalone_full_passed": 1075
+  }
+}
