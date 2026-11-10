@@ -1,0 +1,22 @@
+{
+  "revision": "positive_reference_standards62_20261109",
+  "curation_marker": "short_chain_reference_standard_20261109",
+  "adduct": "[M+H]+",
+  "compounds": [
+    {"class": "Cer", "series": "d", "lcb_c": 14, "lcb_db": 1, "acyl_c": 2, "acyl_db": 0, "acyl_oh": 0},
+    {"class": "Cer", "series": "d", "lcb_c": 18, "lcb_db": 0, "acyl_c": 6, "acyl_db": 0, "acyl_oh": 0},
+    {"class": "Cer", "series": "t", "lcb_c": 18, "lcb_db": 0, "acyl_c": 8, "acyl_db": 0, "acyl_oh": 0},
+    {"class": "Cer", "series": "d", "lcb_c": 18, "lcb_db": 0, "acyl_c": 12, "acyl_db": 0, "acyl_oh": 1},
+    {"class": "Cer", "series": "d", "lcb_c": 18, "lcb_db": 1, "acyl_c": 12, "acyl_db": 0, "acyl_oh": 0},
+    {"class": "Cer", "series": "d", "lcb_c": 18, "lcb_db": 1, "acyl_c": 12, "acyl_db": 0, "acyl_oh": 1},
+    {"class": "Cer1P", "series": "d", "lcb_c": 17, "lcb_db": 1, "acyl_c": 8, "acyl_db": 0, "acyl_oh": 0},
+    {"class": "Cer1P", "series": "d", "lcb_c": 18, "lcb_db": 1, "acyl_c": 12, "acyl_db": 0, "acyl_oh": 0},
+    {"class": "HexCer", "series": "d", "lcb_c": 18, "lcb_db": 2, "acyl_c": 6, "acyl_db": 0, "acyl_oh": 0},
+    {"class": "HexCer", "series": "d", "lcb_c": 18, "lcb_db": 1, "acyl_c": 8, "acyl_db": 0, "acyl_oh": 0},
+    {"class": "HexCer", "series": "d", "lcb_c": 18, "lcb_db": 1, "acyl_c": 12, "acyl_db": 0, "acyl_oh": 0},
+    {"class": "SM", "series": "d", "lcb_c": 18, "lcb_db": 0, "acyl_c": 12, "acyl_db": 0, "acyl_oh": 0},
+    {"class": "SM", "series": "d", "lcb_c": 18, "lcb_db": 1, "acyl_c": 12, "acyl_db": 0, "acyl_oh": 0},
+    {"class": "Cer", "series": "m", "lcb_c": 18, "lcb_db": 0, "acyl_c": 12, "acyl_db": 0, "acyl_oh": 0},
+    {"class": "Cer", "series": "m", "lcb_c": 18, "lcb_db": 1, "acyl_c": 12, "acyl_db": 0, "acyl_oh": 0}
+  ]
+}

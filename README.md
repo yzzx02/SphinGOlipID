@@ -1,5 +1,42 @@
 # SphinGOlipID Python-only Project
 
+## v0.4.0 identification engine
+
+GUI, text CLI and targeted mzML CLI now use the current LipidGate sphingolipid
+engine through an isolated, attributed snapshot. LipidGate itself is not a
+dependency. Positive and negative sphingolipid libraries are bundled; run
+`git lfs pull` after cloning, then `python -m pip install -e .`.
+
+```powershell
+sphingolipid-identify sample.mzML --output identifications.xlsx --fragment-ppm 20
+sphingolipid-ms2 --input-dir RAW --precursor-dir TARGETS --output-dir RESULTS --files 1-6
+sphingolipid-targeted-mzml --data-dir DATA --output-dir RESULTS --fragment-da 0.3
+```
+
+MS1 defaults to 10 ppm. Existing workflow MS2 defaults remain 20 ppm for text
+and 10 ppm for targeted mzML; `--fragment-da` selects Da instead. The reference
+score threshold is 50/100. Fragment pools decide admission; Other does not gate.
+Shared LCB confirmation is inclusive at 1%, separate from Other's strict >0.5%
+scoring threshold. Source ranking and its matched-fragment tie split are retained.
+
+The old absolute-intensity, global matched-count and coverage-score settings
+apply only with `--backend legacy`. GUI exposes the reference score threshold
+and uses the bundled library. A historical MS1 workbook is no longer required.
+The compatibility API `MS2PipelineConfig` retains its explicit legacy default;
+the unified `SphinGOlipIDConfig`, GUI and CLI default to the reference engine.
+
+See [migration and coverage](docs/LIPIDGATE_ENGINE_MIGRATION.md) for the source
+revision, added composition families, scientific limits and validation.
+The workflow descriptions below document the retained v0.3 compatibility path.
+
+The historical 85,710-row MS1 list supplies a type/name crosswalk, not a target
+library size. Current curated chain combinations remain authoritative.
+`config/sphingolipid_type_coverage.csv` distinguishes available MS2 types from
+reference-only modifications; aliases do not prove glycan linkage or OH location.
+`library_catalog.reference_name_candidates` returns explicitly labelled MS1-only
+candidates and does not change fragment admission or ranking. Long MS2 evidence
+is exported in an accompanying content-addressed JSON file when necessary.
+
 This is the Python-only version of the SphinGOlipID sphingolipid annotation toolkit. The uploaded notebooks have been converted into `.py` modules; no original `.ipynb` files are kept in this package.
 
 ## Current implemented functions
@@ -230,14 +267,13 @@ validation modes:
   prefers Linear when it satisfies the applicable constraints.
 - Plot legends report only the unsaturation and fitted R².
 
-## Six-fraction supplementary information
+## Final annotations and retained TOP3 sources
 
-The compact SI release is under
-`supplementary_data/SI_6fractions_20260805/`. It contains the six-fraction
-initial TOP3 identifications, the three ECN/IUP classification summaries,
-the retained RT results with explicit high/low score tiers, and the fitted-line table.
-The wide internal QA tables and raw Agilent `.d`/converted `.mzML` files are
-not included.
+The current 1723-row final workbook, original TOP3 workbooks, verified figure
+coordinates, and fitting comparisons are in `outputs/final_review_20260908/`.
+See `核对说明.md` there for RT normalization, source-fragment evidence, and
+the limits of the OLS/RANSAC comparison. Superseded August outputs and the
+old SI export were removed during the requested September cleanup.
 
 The flat SI tables can be regenerated with:
 
@@ -245,7 +281,7 @@ The flat SI tables can be regenerated with:
 python scripts/export_si_core_tables.py \
   --input path/to/TOP3_RT_input_6_fractions_corrected.csv \
   --results-root path/to/final_RT_results \
-  --output-dir supplementary_data/SI_6fractions_20260805 \
+  --output-dir outputs/new_si_export \
   --include-low-score
 ```
 

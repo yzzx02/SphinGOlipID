@@ -1,0 +1,619 @@
+{
+  "revision": "sphingolipid_hg2_baseline_20261109",
+  "date": "2026-11-09",
+  "status": "fixed_branch_baseline",
+  "application_source_version": "1.0.9",
+  "branch": "codex/sphingolipid-identification",
+  "main": "402bbdd18779db5e5c6be68825e899a0045e3d94",
+  "main_backup": "402bbdd18779db5e5c6be68825e899a0045e3d94",
+  "merged_into_main": false,
+  "preceding_rule_checkpoint": "library_revision_positive_ganglioside_hg2_20261109.json",
+  "preceding_source_checkpoint": "library_revision_positive_ganglioside_coverage_20261108.json",
+  "preceding_release_manifest": "release_v1.0.9.json",
+  "published_release_unchanged": true,
+  "product_code_sha256": "57d94ea87c46a3d8508a2805724cecb5ea3a650114b40db19e9ebf9c4192e8cb",
+  "ms2_rules_sha256": "2617a109dbf995200ceafe8481a0344b87f6d713cf697c39ff742d5e76858056",
+  "library_cache_version": 43,
+  "index_format": 3,
+  "original_library_and_index_files": {
+    "libraries/ms2/current_positive.msp.gz": {
+      "sha256": "50383799b85fe3d706db01d36c00dfdf0e4a6399cf3d1bffa7398490ddfba8f3",
+      "unchanged": true
+    },
+    "libraries/ms2/current_negative.msp.gz": {
+      "sha256": "ae425b298d6cfcb99bb91e4b66e89d2dc77c458d47f1350d83e77299f965225a",
+      "unchanged": true
+    },
+    "build/prebuilt_libraries/current_positive.sqlite": {
+      "sha256": "eb31c9e8590897b751e004ab8795d0b6ac3024c6f81b664498e5b9a5bd18a8ef",
+      "unchanged": true
+    },
+    "build/prebuilt_libraries/current_negative.sqlite": {
+      "sha256": "a1baf290d7778c6f25043e31f9cec04ce5163b4c9a3c9d3462389829a002f0d1",
+      "unchanged": true
+    },
+    "build/prebuilt_libraries/current_positive.catalog.json": {
+      "sha256": "508a6a47aaae300ac2ce256cf168f6a04538df95e8e4325ac667573e669bd57b",
+      "unchanged": true
+    },
+    "build/prebuilt_libraries/current_negative.catalog.json": {
+      "sha256": "b0826294b2e6bb752df3ce73fa6112fbe06aa266d702077d3aa944e6b0f09ac9",
+      "unchanged": true
+    },
+    "build/prebuilt_libraries/cache_rules_sha256.txt": {
+      "sha256": "3535d3dac1fdb3af57e84bed77a206e7b7402c727e8dbf240fc6c833ceb37741",
+      "unchanged": true
+    }
+  },
+  "libraries": {
+    "positive": {
+      "source_path": "libraries/ms2/sphingolipid_positive.msp.gz",
+      "source_records": 1308409,
+      "source_sha256": "7fb002317c48ab7690b77e448c2e1286b467f36210b8ccf4a2d46144d4a07cd4",
+      "source_bytes": 29218399,
+      "index_path": "build/prebuilt_libraries/sphingolipid_positive.sqlite",
+      "index_sha256": "62f4c9b8c5609d79b065770c4a1880b13cfdbf7c57911a51e03ad08056bb0465",
+      "index_bytes": 80445440,
+      "total_index_records": 1316139,
+      "catalog_sha256": "25dfc781f1b3a4ff2f8c2bb9a93a29ddbf31fccf14dbb35a01dbe278f10c67c6",
+      "rules_sha256": "2617a109dbf995200ceafe8481a0344b87f6d713cf697c39ff742d5e76858056",
+      "source_bytes_unchanged": true
+    }
+  },
+  "policy": {
+    "dihexosylceramide": {
+      "classes": [
+        "LacCer",
+        "Hex2Cer"
+      ],
+      "adduct": "[M+H]+",
+      "hg_channels": [
+        "M+H-C12H20O10-H2O",
+        "M+H-C12H20O10-2H2O"
+      ],
+      "hg_minimum": 1,
+      "hg_aggregation": "strongest physical peak",
+      "weights": {
+        "hg": 60,
+        "lcb": 20,
+        "other": 20
+      },
+      "remaining_single_sugar_and_bare_disaccharide_losses": "Other",
+      "hydroxy_acyl_precursor_derived_other_products_retain_oxygen_mass_shift": true,
+      "lcb_gate": false,
+      "other_gate": false,
+      "shared_chain_confirmation_unchanged": true
+    },
+    "ganglioside_families": {
+      "classes": [
+        "GM1",
+        "GD1",
+        "GT1",
+        "GD3"
+      ],
+      "adducts": [
+        "[M+H]+",
+        "[M+NH4]+",
+        "[M+2H]2+",
+        "[M+H+NH4]2+",
+        "[M+2NH4]2+",
+        "[M+H-H2O]+",
+        "[M+2H-H2O]2+"
+      ],
+      "weights": {
+        "hg": 50,
+        "b": 25,
+        "other": 25
+      },
+      "hg_minimum": 2,
+      "b_minimum": 2,
+      "mandatory_neuac_b": [
+        "B-NeuAc",
+        "B-NeuAc-H2O"
+      ],
+      "extended_hexnac_b_required_except": "GD3",
+      "hg_and_b_aggregation": "strongest independent physical peak",
+      "lcb_pool": "Other",
+      "shared_chain_confirmation_raw_min_inclusive": 0.01,
+      "other_raw_min_exclusive": 0.005,
+      "lcb_gate": false,
+      "other_gate": false,
+      "precursor_gate": false,
+      "tentative_bypass": false,
+      "glycan_linkage_isomers_unresolved": true,
+      "legacy_gd1a_gd1b_gt1b_unchanged": true,
+      "existing_gm1_peak_names_masses_intensities_order_retained": true,
+      "benchmark_annotations_used_as_library_seeds": false,
+      "seed_policy": {
+        "gm3_source_chains": 1320,
+        "ordinary_cer_source_chains": 4060,
+        "shared_seed_chains": 3708,
+        "additional_existing_gm1_chains": 1702
+      },
+      "hg_minimum_semantics": "two distinct observed Y/Z peaks; Y0 plus Z0 allowed",
+      "hg_scoring_aggregation_unchanged": true,
+      "second_hg_intensity_threshold_added": false,
+      "source_library_fragments_and_compositions_unchanged": true
+    },
+    "branch_chain_limits_and_t252_exclusion_preserved": true,
+    "negative_policies_unchanged": true,
+    "score_then_physical_fragment_count_ranking_preserved": true,
+    "dt_or_hydroxy_acyl_isomer_predeletion": false
+  },
+  "verification": {
+    "pytest_passed": 1885,
+    "pytest_subtests_passed": 2670,
+    "full_index": {
+      "records_verified": 1316139,
+      "revised_evidence_programs": 115738,
+      "untouched_evidence_programs": 1200401,
+      "target_records": {
+        "GD3 [M+2H-H2O]2+": 3708,
+        "GD3 [M+2H]2+": 3708,
+        "GD3 [M+H+NH4]2+": 3708,
+        "GD3 [M+2NH4]2+": 3708,
+        "GM1 [M+2H-H2O]2+": 5410,
+        "GM1 [M+2H]2+": 5410,
+        "GM1 [M+H+NH4]2+": 5410,
+        "GM1 [M+2NH4]2+": 5410,
+        "GD1 [M+2H-H2O]2+": 3708,
+        "GD1 [M+2H]2+": 3708,
+        "GD1 [M+H+NH4]2+": 3708,
+        "GD1 [M+2NH4]2+": 3708,
+        "GT1 [M+2H-H2O]2+": 3708,
+        "GT1 [M+2H]2+": 3708,
+        "GT1 [M+H+NH4]2+": 3708,
+        "GT1 [M+2NH4]2+": 3708,
+        "GD3 [M+H-H2O]+": 3708,
+        "GD3 [M+H]+": 3708,
+        "GD3 [M+NH4]+": 3708,
+        "GM1 [M+H-H2O]+": 5410,
+        "GM1 [M+H]+": 5410,
+        "GM1 [M+NH4]+": 5410,
+        "GD1 [M+H-H2O]+": 3708,
+        "GD1 [M+H]+": 3708,
+        "GD1 [M+NH4]+": 3708,
+        "GT1 [M+H-H2O]+": 3708,
+        "GT1 [M+H]+": 3708,
+        "GT1 [M+NH4]+": 3708
+      },
+      "rulebook_entries_changed": [
+        "GD1_[M+H]+",
+        "GD1_[M+NH4]+",
+        "GD1_[M+2H]2+",
+        "GD1_[M+H+NH4]2+",
+        "GD1_[M+2NH4]2+",
+        "GD1_[M+H-H2O]+",
+        "GD1_[M+2H-H2O]2+",
+        "GD3_[M+H]+",
+        "GD3_[M+NH4]+",
+        "GD3_[M+2H]2+",
+        "GD3_[M+H+NH4]2+",
+        "GD3_[M+2NH4]2+",
+        "GD3_[M+H-H2O]+",
+        "GD3_[M+2H-H2O]2+",
+        "GM1_[M+H]+",
+        "GM1_[M+NH4]+",
+        "GM1_[M+2H]2+",
+        "GM1_[M+H+NH4]2+",
+        "GM1_[M+2NH4]2+",
+        "GM1_[M+H-H2O]+",
+        "GM1_[M+2H-H2O]2+",
+        "GT1_[M+H]+",
+        "GT1_[M+NH4]+",
+        "GT1_[M+2H]2+",
+        "GT1_[M+H+NH4]2+",
+        "GT1_[M+2NH4]2+",
+        "GT1_[M+H-H2O]+",
+        "GT1_[M+2H-H2O]2+"
+      ],
+      "only_production_change": "new GM1/GD1/GT1/GD3 HG minimum 1 -> 2",
+      "exact_stored_records_ids_masses_intensities_order_and_equivalence_preserved": true,
+      "only_hg_minimum_changed_in_target_programs": true,
+      "b_signatures_weights_confirmation_and_other_policies_unchanged": true,
+      "source_sha256": "7fb002317c48ab7690b77e448c2e1286b467f36210b8ccf4a2d46144d4a07cd4",
+      "rules_sha256": "5c88dcda068367b762ab1237319425bd9ea5007f393e61b6cf491e4aeac950ed"
+    },
+    "real_library_native_reference_cases": {
+      "other_half_percent_boundary": 336,
+      "shared_one_percent_boundary": 336,
+      "missing_structural_direction_rejected": 336,
+      "library_class_adduct_chain_profiles": 84
+    },
+    "measured_hexcer_controls": [
+      {
+        "query_id": "NCI72_Cerebellum_1uL:3193482",
+        "auxiliary": [
+          {
+            "theoretical_mz": 282.2791,
+            "name": "LCB-H2O",
+            "role": "other",
+            "fragment_type": "LCB\u788e\u7247",
+            "observed_mz": 282.314810979514,
+            "intensity": 60.23077,
+            "error_ppm": 126.50947064081242,
+            "scoring_pool": "other",
+            "library_pool": "lcb",
+            "contributes_to_score": true,
+            "auxiliary_lcb_support": true
+          }
+        ],
+        "initial_scores": {
+          "HexCer(d18:1/h24:0)": 87.2252,
+          "HexCer(t18:0/24:1)": 85.1551
+        },
+        "outputs": [
+          {
+            "matched_name": "HexCer(d18:1/h24:0)",
+            "total_score": 87.2252,
+            "result_rank": 1,
+            "matched_fragment_count": 5,
+            "resolution_level": "chain_level",
+            "hg_score": 57.16495454202781,
+            "lcb_score": 16.72695117770691,
+            "other_score": 13.333333333333332
+          },
+          {
+            "matched_name": "HexCer(t18:0/24:1)",
+            "total_score": 85.1551,
+            "result_rank": 2,
+            "matched_fragment_count": 5,
+            "resolution_level": "chain_level",
+            "hg_score": 57.16495454202781,
+            "lcb_score": 14.656812961767487,
+            "other_score": 13.333333333333332
+          }
+        ],
+        "all_class_outputs": [
+          {
+            "compound_class": "HexCer",
+            "adduct": "[M+H]+",
+            "matched_name": "HexCer(d18:1/h24:0)",
+            "total_score": 87.2252,
+            "result_rank": 1
+          },
+          {
+            "compound_class": "HexCer",
+            "adduct": "[M+H]+",
+            "matched_name": "HexCer(t18:0/24:1)",
+            "total_score": 85.1551,
+            "result_rank": 2
+          }
+        ]
+      },
+      {
+        "query_id": "NCI72_Cingulate_1uL:3192497",
+        "auxiliary": [
+          {
+            "theoretical_mz": 282.2791,
+            "name": "LCB-H2O",
+            "role": "other",
+            "fragment_type": "LCB\u788e\u7247",
+            "observed_mz": 282.2877898442854,
+            "intensity": 52.32143,
+            "error_ppm": 30.784582653681003,
+            "scoring_pool": "other",
+            "library_pool": "lcb",
+            "contributes_to_score": true,
+            "auxiliary_lcb_support": true
+          }
+        ],
+        "initial_scores": {
+          "HexCer(d18:1/h24:0)": 91.8009,
+          "HexCer(t18:0/24:1)": 87.0873
+        },
+        "outputs": [
+          {
+            "matched_name": "HexCer(d18:1/h24:0)",
+            "total_score": 91.8009,
+            "result_rank": 1,
+            "matched_fragment_count": 5,
+            "resolution_level": "chain_level",
+            "hg_score": 59.689897135097084,
+            "lcb_score": 18.777671344334593,
+            "other_score": 13.333333333333332
+          },
+          {
+            "matched_name": "HexCer(t18:0/24:1)",
+            "total_score": 87.0873,
+            "result_rank": 2,
+            "matched_fragment_count": 5,
+            "resolution_level": "chain_level",
+            "hg_score": 59.689897135097084,
+            "lcb_score": 14.064031599399417,
+            "other_score": 13.333333333333332
+          }
+        ],
+        "all_class_outputs": [
+          {
+            "compound_class": "HexCer",
+            "adduct": "[M+H]+",
+            "matched_name": "HexCer(d18:1/h24:0)",
+            "total_score": 91.8009,
+            "result_rank": 1
+          },
+          {
+            "compound_class": "HexCer",
+            "adduct": "[M+H]+",
+            "matched_name": "HexCer(t18:0/24:1)",
+            "total_score": 87.0873,
+            "result_rank": 2
+          }
+        ]
+      },
+      {
+        "query_id": "NCI72_Temporal_1uL:3199875",
+        "auxiliary": [
+          {
+            "theoretical_mz": 264.2686,
+            "name": "LCB-2H2O",
+            "role": "other",
+            "fragment_type": "LCB\u788e\u7247",
+            "observed_mz": 264.2759820234524,
+            "intensity": 104.037041,
+            "error_ppm": 27.933789532346232,
+            "scoring_pool": "other",
+            "library_pool": "lcb",
+            "contributes_to_score": true,
+            "auxiliary_lcb_support": true
+          }
+        ],
+        "initial_scores": {
+          "HexCer(d18:1/h24:0)": 86.2677,
+          "HexCer(t18:0/24:1)": 86.2677
+        },
+        "outputs": [
+          {
+            "matched_name": "HexCer(d18:1/h24:0)",
+            "total_score": 86.2677,
+            "result_rank": 1,
+            "matched_fragment_count": 5,
+            "resolution_level": "chain_level",
+            "hg_score": 54.673989970554096,
+            "lcb_score": 18.26039355015096,
+            "other_score": 13.333333333333332
+          },
+          {
+            "matched_name": "HexCer(t18:0/24:1)",
+            "total_score": 86.2677,
+            "result_rank": 1,
+            "matched_fragment_count": 5,
+            "resolution_level": "chain_level",
+            "hg_score": 54.673989970554096,
+            "lcb_score": 18.26039355015096,
+            "other_score": 13.333333333333332
+          }
+        ],
+        "all_class_outputs": [
+          {
+            "compound_class": "HexCer",
+            "adduct": "[M+H]+",
+            "matched_name": "HexCer(d18:1/h24:0)",
+            "total_score": 86.2677,
+            "result_rank": 1
+          },
+          {
+            "compound_class": "HexCer",
+            "adduct": "[M+H]+",
+            "matched_name": "HexCer(t18:0/24:1)",
+            "total_score": 86.2677,
+            "result_rank": 1
+          }
+        ]
+      }
+    ],
+    "formal_full_index_outputs_equal_complete_candidate_window_preview": true,
+    "formal_outputs_equal_previous_hg2_simulation": true,
+    "simulation_queries_compared": 277,
+    "measured_recall": [
+      {
+        "cls": "GM1",
+        "qualified": 89,
+        "before": 72,
+        "after": 69,
+        "lost": 4,
+        "gained": 1,
+        "author_chain_references": 70,
+        "author_chain_matches_before": 11,
+        "author_chain_matches_after": 11
+      },
+      {
+        "cls": "GD1",
+        "qualified": 26,
+        "before": 20,
+        "after": 12,
+        "lost": 8,
+        "gained": 0,
+        "author_chain_references": 26,
+        "author_chain_matches_before": 3,
+        "author_chain_matches_after": 3
+      },
+      {
+        "cls": "GT1",
+        "qualified": 24,
+        "before": 24,
+        "after": 17,
+        "lost": 7,
+        "gained": 0,
+        "author_chain_references": 0,
+        "author_chain_matches_before": 0,
+        "author_chain_matches_after": 0
+      },
+      {
+        "cls": "GD3",
+        "qualified": 22,
+        "before": 20,
+        "after": 19,
+        "lost": 1,
+        "gained": 0,
+        "author_chain_references": 22,
+        "author_chain_matches_before": 6,
+        "author_chain_matches_after": 5
+      }
+    ],
+    "queries_replayed": 619,
+    "unaffected_feature_recall_status_preserved": 910,
+    "changed_query_outputs": 40,
+    "denominator_policy": "Only native features with at least one independently qualified non-sodium M0 query and measured preceding MS1; library/adduct misses remain eligible",
+    "original_primary_features": 1424,
+    "qualified_features": 438,
+    "source_report_sha256": "d82d57e15c1e88c52454954e45c87d8eb0d773f7c4ce9eeb4c3ba32187be4748",
+    "source_report_unchanged": true,
+    "measured_query_sha256": "f457d66503186a8e195b856f4f624725f09d6df0c02f966c94dc59b812eab431",
+    "measured_replay_scope": "same saved centroids; 10ppm/0.3Da, input >=0.2%, score >=50, Top3; total-composition recall",
+    "author_chain_agreement_is_not_independent_accuracy": true,
+    "independent_fdr_estimate": false,
+    "source_msp_bytes_unchanged": true,
+    "all_non_target_gates_and_all_scoring_unchanged": true,
+    "detailed_research_results_outside_source_control": true,
+    "freeze_pytest_passed": 1885,
+    "freeze_subtests_passed": 2670,
+    "canonical_source_ast_equivalent": true,
+    "all_nonmetadata_index_tables_byte_identical": [
+      "blocks",
+      "entries",
+      "equivalent_candidates",
+      "search_plans"
+    ],
+    "no_scientific_policy_change_at_freeze": true,
+    "source_library_bytes_unchanged": true,
+    "installed_default_source_smoke": {
+      "default_source_uses_verified_branch_index": true,
+      "query_outputs_equal_formal_index": 619,
+      "product_source_rules_and_index_fingerprints_match": true,
+      "original_libraries_and_indexes_unchanged": true
+    }
+  },
+  "source_sha256": {
+    "gates": "cd918e72be6665eb16b401a1e6fb1169408989b50bf6338540a3eb547077ef12",
+    "preceding_gates": "10e2cab3b4e2e1cf64c21d9dca80a4fe5c6b59e2eb82361f19109bb3cdba77de",
+    "normalized_spectra": "0ea0d18411611f37a955306ec1015877208473a9f55efaaa1946a1feb13c34db",
+    "scoring": "e3e9d8b147aea35e52acb8b3adfd88e2efe7074c66461c1ef64dd282b1ecbbab",
+    "confirmation": "3a9eda0ab4c163ac27e612377df61842bf1157705e2117e0e9201a7225a2d634"
+  },
+  "native_bridge_reused": true,
+  "git_reference": "codex/sphingolipid-hg2-b2-baseline-20261109",
+  "semantic_rules_revision": "positive_ganglioside_hg2_20261109",
+  "canonical_source_manifest": {
+    "src/lipidgate/__init__.py": "952b9702accd5541ee635c9a8c2ac46ef831c30051b33963e76e1a4e8cdc29a7",
+    "src/lipidgate/__main__.py": "3d2438ae92f4746e9ffaa1f837b1fe803f6281091d1f31f8c95643716f257d9a",
+    "src/lipidgate/cli.py": "4724a9cd505f167142337ca4fd4efade7be0510c8ea6c5fe443703f472e9a380",
+    "src/lipidgate/ecn_filter/__init__.py": "adf4a9a8dea2693d63a4a9134b84d0f5a11730659de02a4c77656eda63c2c491",
+    "src/lipidgate/ecn_filter/confidence_filter.py": "2b808865f5d505793fea68cc5afc4a6f13d8fd303f4811d0d05d47beef8b43dd",
+    "src/lipidgate/ecn_filter/names.py": "8c8d9e28aca9f65235f82f8b8937d73d01e0c3848aebe6ac248d1773bc30d896",
+    "src/lipidgate/ecn_filter/plots.py": "4f5d4569d1069bcaafb890e94264e7a6c3e028fc04408d99ddebed8300c56ac2",
+    "src/lipidgate/ecn_filter/series_consensus.py": "3cbcc7b878bbe5bc803ae9270ab239ebacc5320661aaafea3a9e6b9a27d1d671",
+    "src/lipidgate/ecn_filter/workflow.py": "9eef310c380e362540104cbc835160d861dfb42376d671e86da39902aefd09f4",
+    "src/lipidgate/feature_annotations.py": "eb899757d23d3f321e2c6b49e72e04969d4051f746b699364eae0af588fa4f42",
+    "src/lipidgate/final_results.py": "9c6c35c1f57d3fb9c971a6f0831345d49cf68efa94b6d0918f0685183eeb39d2",
+    "src/lipidgate/gui/__init__.py": "1c9ad311f48b0670bd3a66ebebecc4ad11f917e4cf9ae6499a3b73f21bef4634",
+    "src/lipidgate/gui/app.py": "af57ab886ca71088ebc3e4bd5fd2d5e158d42e2544cb183bf8a448dcc6d91172",
+    "src/lipidgate/gui/components.py": "259db07d0ff80faab0beafb77e6afba0e2e404d7b9a39c036a7bee32c2c39fb2",
+    "src/lipidgate/gui/eic_trace.py": "e6f0d89c73e49c1d068e6a9375d3751253cb38b7dc3de42f04eea7c4b73758aa",
+    "src/lipidgate/gui/library_selection.py": "d3efb8caa8bcf7e32a098db54f16cdd6649b02c5516d843c9a922c6a93954308",
+    "src/lipidgate/gui/parameter_pages.py": "c4fe1d03754982746f8f2e5a66d6fc2090abef84cc6353acee18ac3986895d84",
+    "src/lipidgate/gui/plot_axes.py": "f7cb50a2abae1b6a8f71377a6c107a3892d70db3f2322d862cabe46c70e47859",
+    "src/lipidgate/gui/project_pages.py": "01b799b9df8fce1af98adda75483a1526b08169b45d7cca01c3e8d2fbfadd980",
+    "src/lipidgate/gui/project_worker.py": "fcc300062df9572fae3b499c6541f8b4d7ce0addbdb9c304edba7d2959b6f2a6",
+    "src/lipidgate/gui/qt_eic.py": "8cb4388780763336a1e0308c7268361243002819f731e7d257a7cfff8a36326d",
+    "src/lipidgate/gui/qt_navigation.py": "0e2ae63396e8825cbd4eafae4fc101e0bf369f1b2c3293fa18def4b6021fecc8",
+    "src/lipidgate/gui/qt_spectrum.py": "35acaa5d57d5a9490cd4b22d4c7f29e9b5659e83f7d6940192d5d6d3e95c08eb",
+    "src/lipidgate/gui/result_browser.py": "0d042259b03fb6c0b15ec58590625a6f7c8eddccce47d2992a85e961d95354fe",
+    "src/lipidgate/gui/result_data.py": "6bda8547fade337bfe4075605d7e93653a4ddaabbd579befe78b6c1892891535",
+    "src/lipidgate/gui/result_details.py": "237a0c1ac0a0336f5d6c1ebb326371a6e2d4b7c91156e6169eb426f4cd26d68e",
+    "src/lipidgate/gui/result_export.py": "12f8420013f20dfdccc787df51bb7e6c1a71665bdd85d34d6cefa2aab7fa938c",
+    "src/lipidgate/gui/result_export_data.py": "8d53679d493c5385082a7ac241ec1e97b8e2b762624110d191c31fdb2513ebd4",
+    "src/lipidgate/gui/result_plots.py": "bfab5245bb0b6b15bcff8e75c409b7e037bf5bb48b4d7ea2c850c51fc1ef4719",
+    "src/lipidgate/gui/result_store.py": "4bfeceb2f65f795e482087f261d41f402d9792917f4b02bf4900ef34713c7334",
+    "src/lipidgate/gui/run_progress.py": "9e2f6c2a8f45606b2951ccd77456a3b36a0c3f756ed5475c7d3a80a140886854",
+    "src/lipidgate/gui/ui_icons.py": "0ea5d9392e89f68f15cee6074ba4f58ba63e46b2957b26444ba5a13730fe54eb",
+    "src/lipidgate/ion_relationships.py": "94acf0edbce8b70fe1c9a9ca4da2ff83aef05532ef4032eb87cc77e3320bb28e",
+    "src/lipidgate/ms1/__init__.py": "d70fc03ab49780e771c6340587bcf21a13f09d48d2115b33d02433dc2dc44061",
+    "src/lipidgate/ms1/detection.py": "2637afa5d8e2a543f9801e65f7453029e417045531d68413d4f9055bea78a154",
+    "src/lipidgate/ms2/__init__.py": "4c02593c71ff6abbbc55de31a1506c331d79011754972e220cbb0ebca664d7f2",
+    "src/lipidgate/ms2/aligned_ms2.py": "a3bf5933e34942253ea9ea5ca360f9e92449ff6df137e4934644a6695fae7c43",
+    "src/lipidgate/ms2/chain_labels.py": "eaa82238f9a0e9b0a6f1c971b58cedb6a1dad720f88349e6800ce8510eef1b71",
+    "src/lipidgate/ms2/chain_utils.py": "fe9981c0cc9b21d04905bc36d5815fb871e26cc78e957d06512d6d1962691509",
+    "src/lipidgate/ms2/checkpoints.py": "6ed048ff99dd0759c27bd3cd723e451a055628ca99d674a2a2836aa7367704a4",
+    "src/lipidgate/ms2/chromatographic_membership.py": "b141e78e57e7f4489fb31a39ec670352b5a2db5fc6684bfd576309e05c07af62",
+    "src/lipidgate/ms2/cohort_groups.py": "75f89eea2ddefe8baea8c38c5b5f952c6f30f553b47b32c01383260273df8a6a",
+    "src/lipidgate/ms2/confidence.py": "54b8ec4290f510cca8609565a926b333ef73c1c5ffc797513cb160e9827f00be",
+    "src/lipidgate/ms2/config.py": "e13d4575e5eb483a50841940e403d36a07e5ad59abb4842d86f5e7518cad4d66",
+    "src/lipidgate/ms2/equivalent_candidates.py": "93dc1ac0713bc97157b47b344c803c6bd9f1d23b217be597cd22387d62427fab",
+    "src/lipidgate/ms2/esterified_ceramide.py": "676be748b93fa36235ca5229ef666cd6d92a1247016bcb5b6103fedb7d38b5a0",
+    "src/lipidgate/ms2/evidence_export.py": "0016f264ef5049671e7a16d70d8b0fe080e35b1942c6a37d701bca97d6754969",
+    "src/lipidgate/ms2/evidence_policy.py": "4b1a35b498304730f69a68bc54275849ffb9e184c9f9d61488f2919474b587ac",
+    "src/lipidgate/ms2/feature_linking.py": "37ecd8f4c361e7dc647c1c3a64059b3620a43d667991e41c1f6129876fb910fd",
+    "src/lipidgate/ms2/file_search.py": "4da209fc3d9de633f7bfc649d410cb1b93c73f29a3ec22c86ad4cb31b16085ef",
+    "src/lipidgate/ms2/fragment_labels.py": "3f44291c0979f082b9cd4b9e96783b45db2d2fe70dbef02548798d139eedec6d",
+    "src/lipidgate/ms2/gate_policy.py": "2072bfd3c228553088d338bc8439bd6980e9446b69a0402fd1fdc6d4f6576de7",
+    "src/lipidgate/ms2/import_msdial_sphingo_positive.py": "428956a48eb03ece4d86215f10ca4665c431bc91f85b3e0d31210a52d8fcadb1",
+    "src/lipidgate/ms2/indexed_library.py": "0196ac19030b49c73a78c492ae006f4d66e4f0881518f18cfbf588a38f7301ba",
+    "src/lipidgate/ms2/integration.py": "2d8c8e0592966f91ca14b3db1e46683eac85ccfbe143a246305151261581dea2",
+    "src/lipidgate/ms2/isotope_export.py": "54284f245e21d5a8d95b22dced0bb91a15f28463bbf2fbcedf0c5dc8b1b33c59",
+    "src/lipidgate/ms2/library.py": "bdeb05c51dfb50f0fffa61a030b68efee7e92ef596cac11456ae7f3e13927112",
+    "src/lipidgate/ms2/library_fragment_policy.py": "3bacdeb173d2d8e84459705fa6ba2948b54db754b8e74daa8b68786d608b5b6f",
+    "src/lipidgate/ms2/lipid_naming.py": "593cc7454306899a8255cf87e89294c071e368f641baea33844767834116e3f9",
+    "src/lipidgate/ms2/matching.py": "1f8867fd7430a1a1a20567bdf0c317a0e8e550722fb0fb2c96d30fc0528ef74a",
+    "src/lipidgate/ms2/models.py": "9fba89cc34eedf2b05782f5a953552459b9f5e2b664685a4cfc122dd2dfb0581",
+    "src/lipidgate/ms2/ms1_evidence.py": "cc2ffb14c7a3264095abb77f52eaef597751848988c5b0349f67c8dea63b124f",
+    "src/lipidgate/ms2/msp_tools.py": "c0fea36489758ac25d8fe8a4c7095e444eb39d3320141c87b38c2ac864bf1186",
+    "src/lipidgate/ms2/nae_precursor.py": "58e4404eea9a12a867b616309a19bd0219c329bd2d031f6b1154fe0a5aa703fd",
+    "src/lipidgate/ms2/native_backend/search_bridge.cpp": "60a460fc7d3d75b6b6165c041e13d7397774d595a034dc08c06d20892c46ffc8",
+    "src/lipidgate/ms2/native_backend/search_core.cpp": "fe30bffa8ad93e3a6f839693089ab2bf86ced97644e2021ea8b08e3bd7bcc016",
+    "src/lipidgate/ms2/native_bridge.py": "38021c6ab1f640b2aa2c0757c54362abef5d121e3a408e6e15b4a871ef705a49",
+    "src/lipidgate/ms2/native_engine.py": "cdd7c7b9506611c45f7bf1606dc4ac63cec9df5d40df5b9887e4d78d4bc51d88",
+    "src/lipidgate/ms2/native_plan.py": "0837cac005317de291e4e03fbf7c9e6a7a95c29e7dcd2fd8d5ed8cba9ee7d352",
+    "src/lipidgate/ms2/native_policy.py": "1aabe9367db0ab5d6afeed3bb339c0adb6838444a60e192d1c492bbb0af9093d",
+    "src/lipidgate/ms2/negative_cer_hsu2016.py": "c5f4647474de70c2ab77ff1ed60a4e702186c00537486c3c383e752dc4d2aa60",
+    "src/lipidgate/ms2/negative_gm3.py": "f73c5403b31c755ffd6e409aa32790a3675e036180a82ffe4f8bf7f040eff971",
+    "src/lipidgate/ms2/negative_hexcer.py": "70867a596598120f0cbde46e6f1ca034b1da843fcbe60a1066c94e8862e95d65",
+    "src/lipidgate/ms2/negative_lpc.py": "7cf25a38ec663f668dc8a579079d08701b9cdedb7a9933b9b8ec25020749a077",
+    "src/lipidgate/ms2/negative_lpe.py": "b21c7a63ddae5d5fcd624aa9e400d2d2ebb6a81ab726e251adcc07eaa672663e",
+    "src/lipidgate/ms2/negative_ptdglc.py": "2fa653f9a0b596f69440edc5fb6110dcfb19a5cb3dcbf878a91666c9d79f1f2c",
+    "src/lipidgate/ms2/oxidized_chain_evidence.py": "41f954fd25bae07370845b095072b1f31d4f8eb339317d0edbcacc10e4c0e0f0",
+    "src/lipidgate/ms2/oxidized_fragment_policy.py": "24d77a9303c0e628671496dba5f74aa2186313a3665358251c9454d276546a78",
+    "src/lipidgate/ms2/positive_cer1p.py": "1316f2400f2588b0b0c13ad3f459c89c03f34152213456d0b83bd131a5d2b382",
+    "src/lipidgate/ms2/positive_cer_sodium.py": "5bd6ca828ba3c5a66ca8d18a8436e5183dc5ca7813ca331926ba1efb9aa59078",
+    "src/lipidgate/ms2/positive_ganglioside.py": "0ea0d18411611f37a955306ec1015877208473a9f55efaaa1946a1feb13c34db",
+    "src/lipidgate/ms2/positive_gb4.py": "96de41a301f64796f715ba1382e00a7c515d7e692e7df31364b2d4e1e1e5ca20",
+    "src/lipidgate/ms2/positive_gd2.py": "f700eb5f98698853fdcaa5c15ed58c440edabcb3a1e805a548ae975a7b65c4fb",
+    "src/lipidgate/ms2/positive_gm2.py": "022bdd20be2f797539260a9fb5ada7f32a7d033047852920e1395c6d780c56bb",
+    "src/lipidgate/ms2/positive_gm3.py": "3bb09bfbc5fbbe765f16f0494078f72d8b068ae20a80e2b62808afd29a7362e6",
+    "src/lipidgate/ms2/positive_hexosylceramide.py": "3a9eda0ab4c163ac27e612377df61842bf1157705e2117e0e9201a7225a2d634",
+    "src/lipidgate/ms2/positive_lpc_ether.py": "a60a334ed074360cf5aa60922c127a2cd95ef373c06ce25ac3c87fac4bf511c9",
+    "src/lipidgate/ms2/positive_lpc_sodium.py": "2bb620495dde29b3889805071d62839f667bc3ad4eb9743cab7fc8124914f7f5",
+    "src/lipidgate/ms2/positive_lpe_sodium.py": "bd326735d422ba1a86e0179ada192dab19682d9a8c2ad64db101aae316047e6d",
+    "src/lipidgate/ms2/positive_pc_sodium.py": "eb4a5e77171a3e5c23ab58ca023784b4a66938953c4b26cc29978d5985cc38cf",
+    "src/lipidgate/ms2/positive_pe_cer.py": "25d0c52c4daff710190e88219ff129327e6d36252d78abddf86ba83f13fccf07",
+    "src/lipidgate/ms2/positive_pe_sodium.py": "e61247b2e2d87c8b9c9dc4c66a9d18e43489970bb2e38138704569b97b31b450",
+    "src/lipidgate/ms2/positive_pep_sodium.py": "92bd14701a6fdcd3cb1b09cee8972b8a8c82c9a14120d6c61c66632d3ec14c97",
+    "src/lipidgate/ms2/positive_single_chain_h.py": "41a54e1de482f51612f6ef0375e987ebfc857fe5c56931d56eff5ece1137110b",
+    "src/lipidgate/ms2/positive_spb.py": "ba2aa3494c8f57706bc71b27d3a266e4159fea01c87fdbc2b3eb49d887186324",
+    "src/lipidgate/ms2/positive_sphingolipid.py": "be7767f6bd241f4b75e692b972f15dc765230abab5bd5b76f0fbb3e984c04613",
+    "src/lipidgate/ms2/precursor_refinement.py": "49c067f4155ecc8a8a942820e8a89d91b12b0708f9f76f47f5cfa8680f4ecf57",
+    "src/lipidgate/ms2/prepared_scoring.py": "268ebadf81b322d5a9f59f74bb89ccbdcf8aa073b06a6880246c309a03a7ac50",
+    "src/lipidgate/ms2/provenance.py": "a78df5dd6b8933500dcd61788f0d249cdcc67d1224d665896aa98b224cb8ce6c",
+    "src/lipidgate/ms2/ranking_policy.py": "4a2e628ded67469635e830487cb5b4027e6f60bd19b7ba487f367502f5508290",
+    "src/lipidgate/ms2/record_facts.py": "357a3b1ebd3a7345c14a43ed5783d92f55487b36df6d67248fd0bce44f9679a2",
+    "src/lipidgate/ms2/resolution_policy.py": "2418a1c5f43801f755549708fc9b2c808fa8f3f69b2642a34cd949089a1aaabc",
+    "src/lipidgate/ms2/result_export.py": "cebf360cfcdfcb747d49192d92aba3b62e8f5de73b34a084ee7351f4d7a49b40",
+    "src/lipidgate/ms2/rules.py": "c9f7d4d777454fb657112fe469a2409136fd71ac06070d9e8fc1fadb711fd073",
+    "src/lipidgate/ms2/safe_pickle.py": "e9d11035e303256c56b17a7451805bcb2cb44c914739c96f48209fb2556c8467",
+    "src/lipidgate/ms2/scoring.py": "e3e9d8b147aea35e52acb8b3adfd88e2efe7074c66461c1ef64dd282b1ecbbab",
+    "src/lipidgate/ms2/scoring_policy.py": "608265cbd698d0be144de444839e07669baca05fd6098a35108001fe6abcb3ab",
+    "src/lipidgate/ms2/search.py": "e5528e423c2b59596c00496b5b0a8bbfd433a68d3a6168dbe78d24de25efa5ee",
+    "src/lipidgate/ms2/search_plan.py": "abd81235307b687281428be3ca067043f404f6c82f3beb804ecda97fad037b7f",
+    "src/lipidgate/ms2/spectrum_preparation.py": "8a7c6461e39dcbe50d3d852ef75b2c400a451f4fa3c3bc179906f2afc8cc2780",
+    "src/lipidgate/ms2/sphingolipid_naming.py": "9f4edb58bca2870ef82dd5218a3f6eda181b61e681b4abc656dd2eeb30d83760",
+    "src/lipidgate/ms2/sphingolipid_rules.py": "cd918e72be6665eb16b401a1e6fb1169408989b50bf6338540a3eb547077ef12",
+    "src/lipidgate/ms2/sphingolipid_scoring.py": "9cc506873e3c37e4b4ee62e493fe81a07aa1e48b46e9f96dd70c4654cc5c878f",
+    "src/lipidgate/ms2/workbook_export.py": "718a09e33597362722c8f1f08a1eb3d5d7eb1e083289629ea305ecdb5d5a36bb",
+    "src/lipidgate/ms2/workflow.py": "7bd449491f7eb58ff4f4da8bbbe9c4fdf9a0d0ab545bcb21966d332101086ac3",
+    "src/lipidgate/openms_runtime.py": "71339f41b8db93a93effaa366fb1e9002b3591ee34a505fe025b567637ba5025",
+    "src/lipidgate/paths.py": "53df96b598736bfadbf7fb1afcec5bb01af5c575f1a49fbec4b980ecf87d8424",
+    "src/lipidgate/pipeline.py": "1dfbc92c504dbd0ecc2349bb54f7836fc80589edae24722b619ce0b425d82f00",
+    "src/lipidgate/project.py": "78e60c2c99d3210d9392ae459be9cde14524b2305d7159aa4b29f63cd2d8b07e",
+    "src/lipidgate/pymzml_compat.py": "1cce911784c8bef288aabc5cc013af53d67846bbc84498b252e7c582feebf4ec"
+  }
+}

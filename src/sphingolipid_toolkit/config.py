@@ -83,7 +83,7 @@ class SphinGOlipIDConfig:
 
     raw_ms2_dir: Path
     precursor_dir: Path
-    ms1_library_path: Path
+    ms1_library_path: Path | None
     output_dir: Path
     file_indices: Sequence[int] = tuple(range(1, 7))
     text_pattern: str = "hilic-msms-{i}.txt"
@@ -101,14 +101,28 @@ class SphinGOlipIDConfig:
     enable_rt_validation: bool = True
     enable_deduplication: bool = True
     save_intermediate: bool = False
+    backend: str = "lipidgate"
+    ms2_library_path: Path | None = None
+    precursor_ppm: float = 10.0
+    fragment_da: float | None = None
+    min_total_score: float = 50.0
+    feature_rt_tolerance_min: float = 0.5
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "raw_ms2_dir", Path(self.raw_ms2_dir))
         object.__setattr__(self, "precursor_dir", Path(self.precursor_dir))
-        object.__setattr__(self, "ms1_library_path", Path(self.ms1_library_path))
+        if self.ms1_library_path is not None:
+            object.__setattr__(self, "ms1_library_path", Path(self.ms1_library_path))
+        elif self.backend == 'legacy':
+            raise ValueError('The legacy backend requires an MS1 library')
         object.__setattr__(self, "output_dir", Path(self.output_dir))
         object.__setattr__(self, "file_indices", normalize_file_indices(self.file_indices))
         validate_batch_settings(self)
+        if self.backend not in {"lipidgate", "legacy"}:
+            raise ValueError("backend must be lipidgate or legacy")
+        if self.backend == "lipidgate":
+            from .engine import config_from_workflow
+            config_from_workflow(self)
 
     @property
     def fragment_tolerance_fraction(self) -> float:
@@ -128,7 +142,7 @@ class SphinGOlipIDConfig:
         return cls(
             raw_ms2_dir=input_path,
             precursor_dir=input_path,
-            ms1_library_path=Path(ms1_library_path),
+            ms1_library_path=Path(ms1_library_path) if ms1_library_path is not None else None,
             output_dir=Path(output_dir),
             **kwargs,
         )

@@ -21,13 +21,22 @@ def parameter_values(**changes):
 
 @pytest.mark.parametrize("changes", [
     {"fragment_ppm": "0"}, {"fragment_ppm": "nan"},
-    {"min_fragment_intensity": "-1"}, {"min_match_score": "1.1"},
-    {"min_match_score": "inf"}, {"min_matched_fragments": "2.5"},
+    {"precursor_ppm": "-1"}, {"min_total_score": "101"},
+    {"min_total_score": "inf"}, {"top_n": "2.5"},
     {"top_n": "0"}, {"top_n": ""},
 ])
 def test_parameters_reject_invalid_user_input(changes):
     with pytest.raises(ValueError):
         gui.parse_matching_parameters(parameter_values(**changes))
+
+
+def test_bundled_library_gui_is_ready_with_three_inputs(app,tmp_path):
+    select_inputs(app,tmp_path)
+    app.selection.ms1_db_file=None
+    app._refresh_selection_labels()
+    assert app.run_button.instate(['!disabled'])
+    config=app._build_config()
+    assert config.backend=='lipidgate' and config.ms1_library_path is None
 
 
 def test_result_filter_uses_literal_names_numeric_scores_and_original_rows():
@@ -134,9 +143,8 @@ def test_run_freezes_parameters_preserves_navigation_and_recovers_controls(app, 
     select_inputs(app, tmp_path)
     app.parameter_vars["fragment_ppm"].set("12.5")
     app.parameter_vars["top_n"].set("5")
-    app.parameter_vars["min_fragment_intensity"].set("30")
-    app.parameter_vars["min_matched_fragments"].set("3")
-    app.parameter_vars["min_match_score"].set("0.55")
+    app.parameter_vars["precursor_ppm"].set("8")
+    app.parameter_vars["min_total_score"].set("55")
     app.save_intermediate.set(True)
     started = threading.Event()
     release = threading.Event()
@@ -164,9 +172,9 @@ def test_run_freezes_parameters_preserves_navigation_and_recovers_controls(app, 
         app.parameter_vars["top_n"].set("9")
         assert snapshots[0].top_n == 5
         assert snapshots[0].fragment_ppm == 12.5
-        assert snapshots[0].min_fragment_intensity == 30
-        assert snapshots[0].min_matched_fragments == 3
-        assert snapshots[0].min_match_score == 0.55
+        assert snapshots[0].precursor_ppm == 8
+        assert snapshots[0].min_total_score == 55
+        assert snapshots[0].backend == 'lipidgate'
         assert snapshots[0].save_intermediate
         app.root.update()
     finally:
@@ -244,12 +252,15 @@ def test_queue_drain_is_bounded_and_remains_scheduled(app):
     assert app.queue_after in app.root.tk.splitlist(app.root.tk.call("after", "info"))
 
 
-def test_real_gui_run_processes_spectrum_after_upstream_merge(app, tmp_path):
+def test_real_gui_run_processes_spectrum_after_upstream_merge(app, tmp_path, monkeypatch):
     from test_bug_regressions import _write_inputs
     config = _write_inputs(tmp_path)
     app.selection = gui.FileSelection(tmp_path / "hilic-msms-1.txt", tmp_path / "hilic-msms-1.xlsx",
                                       config.ms1_library_path, config.output_dir)
     app._refresh_selection_labels()
+    from dataclasses import replace
+    original_build = app._build_config
+    monkeypatch.setattr(app,'_build_config',lambda:replace(original_build(),backend='legacy'))
     app._start_run()
     deadline = time.monotonic() + 10
     while app.running and time.monotonic() < deadline:

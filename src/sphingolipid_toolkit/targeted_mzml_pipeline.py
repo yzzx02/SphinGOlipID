@@ -55,9 +55,18 @@ class TargetedMzMLConfig:
     fitted_result_name: str = "targeted_mzml_rt_fitted_identifications.xlsx"
     feature_table_name: str = "combined_ms1_feature_table.xlsx"
     raw_targetlist_name: str = "combined_targetlist_raw.xlsx"
+    backend: str = "lipidgate"
+    ms2_library_path: Path | None = None
+    fragment_da: float | None = None
+    min_total_score: float = 50.0
 
     def __post_init__(self) -> None:
         validate_matching_parameters(self)
+        if self.backend not in {"lipidgate", "legacy"}:
+            raise ValueError("backend must be lipidgate or legacy")
+        if self.backend == "lipidgate":
+            from .engine import config_from_workflow
+            config_from_workflow(self)
         for name in ("ms1_candidate_ppm", "feature_mz_ppm", "feature_rt_tolerance_min", "feature_merge_ppm",
                      "feature_merge_mz_tolerance_da", "feature_merge_rt_tolerance_min", "rt_fit_residual_threshold"):
             value = getattr(self, name)
@@ -66,7 +75,10 @@ class TargetedMzMLConfig:
         if not isinstance(self.rt_fit_min_points, int) or isinstance(self.rt_fit_min_points, bool) or self.rt_fit_min_points < 2:
             raise ValueError("rt_fit_min_points must be an integer of at least 2")
         object.__setattr__(self, "data_dir", Path(self.data_dir))
-        object.__setattr__(self, "ms1_library_path", Path(self.ms1_library_path))
+        if self.ms1_library_path is not None:
+            object.__setattr__(self, "ms1_library_path", Path(self.ms1_library_path))
+        elif self.backend == 'legacy':
+            raise ValueError('The legacy backend requires an MS1 library')
         object.__setattr__(self, "output_dir", Path(self.output_dir))
         if self.targetlist_dir is None:
             object.__setattr__(self, "targetlist_dir", Path(self.data_dir) / "targetlist")
@@ -123,7 +135,9 @@ def _find_input_files(directory: str | Path, suffix: str) -> list[Path]:
 
 
 def _validate_targeted_paths(config: TargetedMzMLConfig) -> None:
-    library = require_file(config.ms1_library_path, "MS1 theoretical library")
+    from .engine import library_path
+    library = require_file(config.ms1_library_path if config.backend == 'legacy' else
+        config.ms2_library_path or library_path('+'), "MS2 library" if config.backend!='legacy' else "MS1 theoretical library")
     targetlists = _find_input_files(config.targetlist_dir, ".csv")
     spectra = _find_input_files(config.mzml_dir, ".mzml")
     if not targetlists or not spectra:
@@ -169,17 +183,19 @@ def _run_targeted_mzml_batch(config: TargetedMzMLConfig, logger: logging.Logger)
         rt_tolerance_min=config.feature_merge_rt_tolerance_min,
     )
     logger.info("Loading MS1 theoretical library")
-    library = _read_legacy_or_normalized_ms1_library(config.ms1_library_path)
+    library = (_read_legacy_or_normalized_ms1_library(config.ms1_library_path)
+               if config.backend == "legacy" else pd.DataFrame())
     write_excel_atomic(targetlist_raw, output_dir / config.raw_targetlist_name, index=False)
     write_excel_atomic(features, output_dir / config.feature_table_name, index=False)
 
     logger.info("Matching targeted mzML files")
     raw_results = annotate_mzml_directory(features, library, config, logger=logger)
-    write_excel_atomic(raw_results, output_dir / config.raw_result_name, index=False)
+    from .result_writer import write_identifications
+    write_identifications(raw_results, output_dir / config.raw_result_name)
 
     logger.info("Running RT fitting filter with top 1-%s candidates", config.top_n)
     fitted_results = apply_rt_fit_filter(raw_results, config)
-    write_excel_atomic(fitted_results, output_dir / config.fitted_result_name, index=False)
+    write_identifications(fitted_results, output_dir / config.fitted_result_name)
 
     logger.info("Targeted mzML workflow completed")
     return {
@@ -311,6 +327,9 @@ def annotate_mzml_directory(
     """Annotate every MS2 spectrum in all mzML files and return long-form rows."""
 
     logger = logger or get_logger("sphingolipid_toolkit.targeted_mzml")
+    if config.backend == "lipidgate":
+        from .reference_pipeline import annotate_targeted_directory
+        return annotate_targeted_directory(features, config, logger)
     mzml_files = _find_input_files(config.mzml_dir, ".mzml")
     rows: list[pd.DataFrame] = []
     with TemporaryDirectory(prefix="sphingolipid_targeted_") as temp_dir:
@@ -407,6 +426,11 @@ def annotate_one_spectrum(
     """Annotate one MS2 spectrum against legacy-generated candidate fragments."""
 
     logger = logger or get_logger("sphingolipid_toolkit.targeted_mzml")
+    if config.backend == "lipidgate":
+        from .engine import SphingolipidIdentifier, config_from_workflow
+        from .reference_pipeline import annotate_targeted_spectrum
+        with SphingolipidIdentifier(config_from_workflow(config)) as identifier:
+            return annotate_targeted_spectrum(spectrum, feature, config, identifier)
     feature_id = str(feature["feature_id"])
     logger.debug("Effective fragment_ppm=%s for scan %s", config.fragment_ppm, spectrum.scan_id)
     candidates = search_ms1_candidates(
@@ -891,7 +915,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--data-dir", required=True, type=Path, help="Root folder containing targetlist/ and mzML files.")
     parser.add_argument("--targetlist-dir", type=Path, default=None, help="Folder containing Agilent targetlist CSV files.")
     parser.add_argument("--mzml-dir", type=Path, default=None, help="Folder containing mzML files. Defaults to --data-dir.")
-    parser.add_argument("--ms1-db", required=True, type=Path, help="MS1 theoretical library Excel/CSV file.")
+    parser.add_argument("--ms1-db", type=Path, help="MS1 Excel/CSV library; required only for --backend legacy.")
     parser.add_argument("--output-dir", required=True, type=Path, help="Output folder.")
     parser.add_argument("--fragment-ppm", type=float, default=TARGETED_FRAGMENT_PPM, help=f"MS2 fragment matching tolerance in ppm. Default: {TARGETED_FRAGMENT_PPM:g}.")
     parser.add_argument("--ms1-ppm", type=float, default=10.0, help="MS1 library candidate tolerance in ppm. Default: 10.")
@@ -900,6 +924,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--min-fragments", type=int, default=2)
     parser.add_argument("--min-score", type=float, default=0.35)
     parser.add_argument("--top-n", type=int, default=3)
+    parser.add_argument("--backend",choices=("lipidgate","legacy"),default="lipidgate")
+    parser.add_argument("--ms2-library",type=Path)
+    parser.add_argument("--fragment-da",type=float)
+    parser.add_argument("--min-total-score",type=float,default=50.)
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
 
@@ -917,6 +945,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         min_matched_fragments=args.min_fragments,
         min_match_score=args.min_score,
         top_n=args.top_n,
+        backend=args.backend,
+        ms2_library_path=args.ms2_library,
+        fragment_da=args.fragment_da,
+        min_total_score=args.min_total_score,
     )
     outputs = run_targeted_mzml_batch(config, logger=logger)
     print("Generated output files:")

@@ -30,9 +30,8 @@ ACCENT = "#2563eb"
 # Field, label, spinner bounds, increment, numeric type.
 PARAMETERS = (
     ("fragment_ppm", "碎片容差 (ppm)", 0.1, 1000, 1, float),
-    ("min_fragment_intensity", "最低碎片强度", 0, 1000000, 10, float),
-    ("min_matched_fragments", "最少匹配碎片数", 1, 1000, 1, int),
-    ("min_match_score", "最低匹配得分", 0, 1, 0.05, float),
+    ("precursor_ppm", "前体容差 (ppm)", 0.1, 1000, 1, float),
+    ("min_total_score", "最低总分 (0–100)", 0, 100, 1, float),
     ("top_n", "每个前体保留 Top-N", 1, 1000, 1, int),
 )
 NAME_COLUMNS = ("lipid_name", "注释", "name", "annotation", "Lipid")
@@ -41,7 +40,7 @@ RESULT_FIELDS = (
     (("lipid_name", "注释", "name", "annotation"), "脂质名称", 240),
     (("observed_mz", "target"), "前体 m/z", 110),
     (("observed_rt", "RT"), "保留时间 (min)", 130),
-    (("ms2_match_score", "匹配度分数"), "MS2 得分", 100),
+    (("total_score", "ms2_match_score", "匹配度分数"), "MS2 得分", 100),
     (("rank",), "候选排名", 90),
     (("matched_fragment_count",), "匹配碎片数", 110),
     (("signal_intensity", "Abund"), "信号强度", 120),
@@ -71,7 +70,12 @@ class FileSelection:
 def parse_matching_parameters(values: Mapping[str, str]) -> dict[str, float | int]:
     """Validate user-entered values before creating a backend configuration."""
     parsed: dict[str, float | int] = {}
-    for key, label, _low, _high, _step, numeric_type in PARAMETERS:
+    legacy=(('min_fragment_intensity','最低碎片强度',0,1000000,10,float),
+            ('min_matched_fragments','最少匹配碎片数',1,1000,1,int),
+            ('min_match_score','最低匹配得分',0,1,.05,float))
+    schema = ((PARAMETERS[0],*legacy,PARAMETERS[-1])
+              if any(key in values for key,*_ in legacy) else PARAMETERS)
+    for key, label, _low, _high, _step, numeric_type in schema:
         try:
             value = numeric_type(values[key].strip())
         except (KeyError, TypeError, ValueError, OverflowError) as exc:
@@ -79,7 +83,7 @@ def parse_matching_parameters(values: Mapping[str, str]) -> dict[str, float | in
             raise ValueError(f"{label}须填写有效的{unit}。") from exc
         if not math.isfinite(value):
             raise ValueError(f"{label}须填写有限数值。")
-        if key == "fragment_ppm" and value <= 0:
+        if key in {"fragment_ppm", "precursor_ppm"} and value <= 0:
             raise ValueError("碎片容差须大于 0 ppm。")
         if key == "min_fragment_intensity" and value < 0:
             raise ValueError("最低碎片强度不能为负数。")
@@ -87,6 +91,8 @@ def parse_matching_parameters(values: Mapping[str, str]) -> dict[str, float | in
             raise ValueError(f"{label}须为不小于 1 的整数。")
         if key == "min_match_score" and not 0 <= value <= 1:
             raise ValueError("最低匹配得分须在 0 到 1 之间。")
+        if key == 'min_total_score' and not 0 <= value <= 100:
+            raise ValueError('最低总分须在 0 到 100 之间。')
         parsed[key] = value
     return parsed
 
@@ -172,7 +178,7 @@ class SphinGOlipIDApp:
             for key, *_rest in PARAMETERS
         }
         self.save_intermediate = tk.BooleanVar(value=False)
-        self.setup_status = tk.StringVar(value="请选择四项输入与输出位置。")
+        self.setup_status = tk.StringVar(value="请选择原始谱图、前体目标表与输出位置；使用内置鞘脂库。")
         self.run_status = tk.StringVar(value="准备就绪 · 选择文件后开始解析，或打开已有结果。")
         self.result_path = tk.StringVar(value="尚未打开结果文件")
         self.result_summary = tk.StringVar(value="尚未加载结果")
@@ -274,7 +280,6 @@ class SphinGOlipIDApp:
         rows = (
             ("原始 MS/MS 数据 (.txt)", "txt_file", self._choose_txt),
             ("前体离子目标表 (.xlsx)", "precursor_file", self._choose_precursor),
-            ("MS1 理论数据库 (.xlsx)", "ms1_db_file", self._choose_ms1_db),
             ("结果输出文件夹", "output_dir", self._choose_output_dir),
         )
         for row, (label, key, command) in enumerate(rows):
@@ -431,9 +436,9 @@ class SphinGOlipIDApp:
         for key, variable in self.path_vars.items():
             path = getattr(self.selection, key)
             variable.set(str(path) if path else "未选择")
-            count += path is not None
-        self.setup_status.set(f"已选择 {count}/4 项" if count < 4 else "输入已就绪，可开始解析。")
-        self.run_button.configure(state=tk.NORMAL if count == 4 and not self.running else tk.DISABLED)
+            count += path is not None and key in {'txt_file','precursor_file','output_dir'}
+        self.setup_status.set(f"已选择 {count}/3 项" if count < 3 else "输入已就绪，使用内置鞘脂库。")
+        self.run_button.configure(state=tk.NORMAL if count == 3 and not self.running else tk.DISABLED)
 
     def _reset_parameters(self) -> None:
         if self.running:
@@ -444,11 +449,11 @@ class SphinGOlipIDApp:
 
     def _validate_selection(self) -> str | None:
         labels = {"txt_file": "原始 MS/MS 数据", "precursor_file": "前体离子目标表",
-                  "ms1_db_file": "MS1 理论数据库", "output_dir": "结果输出文件夹"}
+                  "output_dir": "结果输出文件夹"}
         missing = [label for key, label in labels.items() if getattr(self.selection, key) is None]
         if missing:
             return "请先选择：" + "、".join(missing)
-        for key in ("txt_file", "precursor_file", "ms1_db_file"):
+        for key in ("txt_file", "precursor_file"):
             if not getattr(self.selection, key).is_file():
                 return f"{labels[key]}不存在或不是文件，请重新选择。"
         if self.selection.output_dir.exists() and not self.selection.output_dir.is_dir():

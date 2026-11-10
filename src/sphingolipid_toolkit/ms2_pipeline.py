@@ -53,6 +53,12 @@ class MS2PipelineConfig:
     min_match_score: float = 0.35
     top_n: int = 3
     keep_intermediate: bool = False
+    backend: str = "legacy"
+    ms2_library_path: Path | None = None
+    precursor_ppm: float = 10.0
+    fragment_da: float | None = None
+    min_total_score: float = 50.0
+    feature_rt_tolerance_min: float = 0.5
 
     def __post_init__(self) -> None:
         self.input_dir = Path(self.input_dir)
@@ -86,11 +92,18 @@ ConfigLike = MS2PipelineConfig | SphinGOlipIDConfig
 def _coerce_config(config: ConfigLike) -> MS2PipelineConfig:
     if isinstance(config, MS2PipelineConfig):
         return config
+    from .engine import library_path
     return MS2PipelineConfig(
+        backend=config.backend,
+        ms2_library_path=config.ms2_library_path,
+        precursor_ppm=config.precursor_ppm,
+        fragment_da=config.fragment_da,
+        min_total_score=config.min_total_score,
+        feature_rt_tolerance_min=config.feature_rt_tolerance_min,
         input_dir=config.raw_ms2_dir,
         precursor_dir=config.precursor_dir,
         output_dir=config.output_dir,
-        ms1_db_path=config.ms1_library_path,
+        ms1_db_path=config.ms1_library_path or config.ms2_library_path or library_path('+'),
         file_indices=config.file_indices,
         text_pattern=config.text_pattern,
         target_pattern=config.target_pattern,
@@ -229,6 +242,9 @@ def run_one_file(config: ConfigLike, file_index: int, logger: logging.Logger | N
 
     config = _coerce_config(config)
     logger = logger or get_logger("sphingolipid_toolkit.ms2")
+    if config.backend == "lipidgate":
+        from .reference_pipeline import run_text_file
+        return run_text_file(config, file_index, logger)
     logger.info("Effective fragment_ppm=%s (legacy text workflow config)", config.fragment_ppm)
     input_dir = Path(config.input_dir)
     precursor_dir = Path(config.precursor_dir or config.input_dir)

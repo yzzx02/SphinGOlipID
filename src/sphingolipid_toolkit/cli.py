@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Folder containing precursor target Excel files. Defaults to --input-dir.",
     )
     parser.add_argument("--output-dir", required=True, type=Path, help="Folder where result_msms-{i}.xlsx files will be written.")
-    parser.add_argument("--ms1-db", required=True, type=Path, help="MS1 theoretical database Excel file, e.g. MS1 DB_new 3.0.xlsx.")
+    parser.add_argument("--ms1-db", type=Path, help="MS1 Excel database, required only with --backend legacy.")
     parser.add_argument("--files", default="1-6", help="File indices to process, e.g. 1-6 or 1,3,5.")
     parser.add_argument("--encoding", default="GBK", help="Encoding of exported MS/MS txt files. Default: GBK.")
     parser.add_argument("--fragment-ppm", type=float, default=LEGACY_FRAGMENT_PPM, help=f"Fragment m/z tolerance in ppm. Default: {LEGACY_FRAGMENT_PPM:g}.")
@@ -35,6 +35,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-fragments", type=int, default=2, help="Minimum number of matched fragments. Default: 2.")
     parser.add_argument("--min-score", type=float, default=0.35, help="Minimum MS2 match score. Default: 0.35.")
     parser.add_argument("--top-n", type=int, default=3, help="Keep top N candidates per precursor. Default: 3.")
+    parser.add_argument("--backend", choices=("lipidgate", "legacy"), default="lipidgate")
+    parser.add_argument("--ms2-library", type=Path, help="Optional validated sphingolipid SQLite index.")
+    parser.add_argument("--precursor-ppm", type=float, default=10.)
+    parser.add_argument("--fragment-da", type=float, help="Use an absolute MS2 tolerance instead of ppm.")
+    parser.add_argument("--min-total-score", type=float, default=50., help="Reference engine total score threshold (0-100).")
     parser.add_argument(
         "--keep-intermediate",
         "--save-intermediate",
@@ -62,6 +67,11 @@ def main(argv: list[str] | None = None) -> int:
         min_match_score=args.min_score,
         top_n=args.top_n,
         save_intermediate=args.save_intermediate,
+        backend=args.backend,
+        ms2_library_path=args.ms2_library,
+        precursor_ppm=args.precursor_ppm,
+        fragment_da=args.fragment_da,
+        min_total_score=args.min_total_score,
     )
     results = run_batch(config, logger=logger)
     print("Generated result files:")

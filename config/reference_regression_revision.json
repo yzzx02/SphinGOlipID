@@ -1,0 +1,90 @@
+{
+  "tests/ms2/test_indexed_library.py": {
+    "upstream_sha256": "f4acf39218e1a0d1408304913198224c19c75b0492c9063d9fe8ea7af3319051",
+    "ported_sha256": "d12654af3b08d8369295e91b14be9527aff05624bcb93b0fc2b40c3c34da3f4a"
+  },
+  "tests/ms2/test_sphingolipid_rules.py": {
+    "upstream_sha256": "f1d6cf8a7d2dd9a30b0c6306e261cbd2facb0bf8a442cda5b32e8932cbb30092",
+    "ported_sha256": "bb7610bd9ee34ae5941e5babd479d500c501a96692ecddc0b9e1c43e247334d5"
+  },
+  "tests/ms2/test_sphingolipid_unified_lcb.py": {
+    "upstream_sha256": "96bbc09876227e5f74438ff393ebbae21f657830a4676eef8a9f2d0971ad5cf6",
+    "ported_sha256": "3064a058fb7de32ca8122e9a75b096e3afc672cbf63d0383e26c2e24308ef584"
+  },
+  "tests/ms2/test_sphingolipid_isomer_ties.py": {
+    "upstream_sha256": "104e3cc54b97a93f35f792126b617ba875747b6790d82d8d4636254f8a643b66",
+    "ported_sha256": "81a3115b3d3580e1b93e24a0dcc61e1795b30d8536dcd28d907d4cd261bad043"
+  },
+  "tests/ms2/test_sphingolipid_isomer_ranking.py": {
+    "upstream_sha256": "3960c12772580cdcfe95c70f1d56892bb1b94ce5d5075f071e4c12bc5344fba0",
+    "ported_sha256": "7ad6c67a9f18ac1f3cf6c4f0b7e3d866a8874a7f7d79883a34a2aa364fd41fab"
+  },
+  "tests/ms2/test_cer_lcb_other_support.py": {
+    "upstream_sha256": "08931b02aaee8ac5f692b31fcd7979f22627e742f260dfd6bf7b7bac7eff3e31",
+    "ported_sha256": "1b72890e72747c39fa9c3334a7ed9faeb3b7e370c1295506ce1b77888b5dc4a4"
+  },
+  "tests/ms2/test_hexcer_lcb_other_support.py": {
+    "upstream_sha256": "ad7c80494b16fd8b3c80f59307b32c5bd25b8ec6003456b3054df73345aea35d",
+    "ported_sha256": "3008864cf7298e2f6b27c2d956f2ee88dc4515229c33687b92bb8f7b9bd8f199"
+  },
+  "tests/ms2/test_positive_shexcer.py": {
+    "upstream_sha256": "d4499b73b8805814762b0b099340737cd166d7af27bb2bb12e2f1521739292dd",
+    "ported_sha256": "d3fb6b9e4657123cbeb6c0c07caf08ac0d48e88655ed865940d85381916377aa"
+  },
+  "tests/ms2/test_positive_dihexosylceramide.py": {
+    "upstream_sha256": "1b0ff754057f9ce3fb08b36e924b0662cfda251faaf207f5094c7c76c1e6bd14",
+    "ported_sha256": "f1f60a93f41780c7dc42f6079c1baa86b84276f46bc1adf8156337d6a3f84264"
+  },
+  "tests/ms2/test_positive_catalog_glycosphingolipid.py": {
+    "upstream_sha256": "93f4de76c1487e7452d257149cfe9a43b4b1f0b53235129952c5b6f71493bb19",
+    "ported_sha256": "f1ae7255ba7750cb13bf88210147991561ef218eaecac2dffd6dba20486c0ea7"
+  },
+  "tests/ms2/test_positive_ganglioside.py": {
+    "upstream_sha256": "05e7dd082ba78e779f8eed5038bac22aa09a01e7ee577d815537e2e50aa27853",
+    "ported_sha256": "fe9aaf6fac9503c149614b338aa9f704cd28908ad1712c06c93a186c37ddf21d"
+  },
+  "tests/ms2/test_positive_cer_sodium.py": {
+    "upstream_sha256": "3f294ed2dddbc9bed4e5f3998f13b1d14c4bbce5401488201b199db76e5cca29",
+    "ported_sha256": "f7a96a6c1f0379e3f5818b463364d3265f9ee6b4690e304cbcafa0512efb8ca4"
+  },
+  "tests/ms2/test_positive_cer1p.py": {
+    "upstream_sha256": "226be2455887ca5133f7f511e5e3ff1a2f605f8caf1e4a8e09df910b70e77635",
+    "ported_sha256": "ff550a7b7886a768ef4ffe5c897dc0912bc2ddf6e31d58e097503ff1d2ec9ed5"
+  },
+  "tests/ms2/test_negative_cer_hsu2016.py": {
+    "upstream_sha256": "8d3f61a218bf4db490c250b44e9da8a8197dd16b96f36b72644b27d0dc95a0b6",
+    "ported_sha256": "7f05f6d81a6d6f4888506974d73f9d8eb415d8ac1eecd08c5a9f3ede7a0dfac4"
+  },
+  "scripts/curate_positive_ganglioside_library.py": {
+    "upstream_sha256": "8ba3710eb337c7293fcf9b0c573ad91dd7de6179a66751ed20a27fe3bf427f46",
+    "ported_sha256": "30b8c3b32bc20c35989036bfdee633b1a5444e77fa632b2daefa4a3054a5797c"
+  },
+  "scripts/curate_positive_gb4_library.py": {
+    "upstream_sha256": "b1db4402cd87c7b3c6c9aba283f547ee1f42f8c5ea00700798270abfab6f6e2d",
+    "ported_sha256": "45be3ac2acba0164b1d2fdfbd887538be98421ccf8c0ae7ee195e389f9d2a8cf"
+  },
+  "scripts/extend_positive_cer_sodium_library.py": {
+    "upstream_sha256": "2266296e1d5092bc240f3d090c376cd58a3c3a6e29d7054f990a4c88885f514d",
+    "ported_sha256": "7f1b6838b7a10853ebafc0eaadd12c9a069e1312d6a13a9dd7df8953f1e8205d"
+  },
+  "scripts/curate_positive_cer1p_library.py": {
+    "upstream_sha256": "9475d4460d8aa348a00a2e0286e80dee71d94f07d365c0e3e8c235a3979e3af4",
+    "ported_sha256": "6882bce26d7e999421ec9e61ad0b8d497092daa018b1999c3ca6df2c94503d82"
+  },
+  "scripts/extend_positive_catalog_glycosphingolipid_library.py": {
+    "upstream_sha256": "d7e30373970a0e1543c4a184515dc8d9dd8cb3616aa459a3122737999633c96a",
+    "ported_sha256": "b3e51e126b18562e9017c664183499fef5611fbee7510fc9b2984035e7ec9427"
+  },
+  "scripts/curate_positive_sphingolipid_chain_limits.py": {
+    "upstream_sha256": "f5ff1d6daa67299398d9f5a61f042b5b8665bc2df4b056fdfd62ba2fdf943aa7",
+    "ported_sha256": "5a68a0fcbfe6c724fc978f647101ff787cdd0f98461d82091dd366f1ca341485"
+  },
+  "scripts/curate_positive_hexosylceramide_library.py": {
+    "upstream_sha256": "b545957d8db7a07e03d06b9339fd4828c77ea25c7112f9d18c2b37ef3cb17957",
+    "ported_sha256": "b09329e5eb855996191f60445bac4b704a20abc900e7218e1cb1263bcf13da8a"
+  },
+  "scripts/build_sphingolipid_name_catalog.py": {
+    "upstream_sha256": "82cc87918a77acf9f01773d4b3568ca81477ec01ef83658d32130ef0ae594fd0",
+    "ported_sha256": "451bce3ccf51cde594ab28ca7b2ae4ff33eba7ed564b2776b376aaee88e4a48f"
+  }
+}

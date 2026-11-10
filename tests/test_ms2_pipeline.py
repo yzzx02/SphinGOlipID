@@ -11,7 +11,7 @@ def test_run_one_file_reports_missing_ms2_text(tmp_path):
         output_dir=tmp_path / "out",
         ms1_library_path=tmp_path / "library.xlsx",
         file_indices=(1,),
-    )
+    backend="legacy")
 
     with pytest.raises(FileNotFoundError, match="Missing required MS/MS txt file"):
         run_one_file(config, 1)
@@ -49,7 +49,7 @@ def test_run_batch_writes_v03_acceptance_outputs(tmp_path):
         ms1_library_path=library,
         output_dir=output_dir,
         file_indices=(1,),
-    )
+    backend="legacy")
     results = run_batch(config)
 
     assert results == [output_dir / "result_msms-1.xlsx"]

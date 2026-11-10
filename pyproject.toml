@@ -4,10 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sphingolipid-toolkit"
-version = "0.3.0"
-description = "Project scaffold for SphinGOlipID sphingolipid MS/MS annotation workflow"
+version = "0.4.0"
+description = "SphinGOlipID sphingolipid identification with fragment-pool evidence gates"
 requires-python = ">=3.10"
 dependencies = [
+  "pymzml>=2.5",
     "numpy>=1.23",
     "pandas>=1.5",
     "openpyxl>=3.1",
@@ -15,11 +16,12 @@ dependencies = [
     "scikit-learn>=1.2",
     "scipy>=1.10",
     "matplotlib>=3.7",
-    "pyteomics>=4.6",
+    "pyteomics[xml]>=4.6,<5",
 ]
 
 [project.scripts]
 sphingolipid-ms2 = "sphingolipid_toolkit.cli:main"
+sphingolipid-identify = "sphingolipid_toolkit.identify_cli:main"
 sphingolipid-targeted-mzml = "sphingolipid_toolkit.targeted_mzml_pipeline:main"
 sphingolipid-gui = "sphingolipid_toolkit.gui:main"
 
@@ -27,7 +29,7 @@ sphingolipid-gui = "sphingolipid_toolkit.gui:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-sphingolipid_toolkit = ["gui_assets/*.png"]
+sphingolipid_toolkit = ["gui_assets/*.png", "data/*.json", "data/*.csv.gz", "data/ms2/*.sqlite", "data/ms2/*.msp.gz"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

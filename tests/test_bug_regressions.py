@@ -101,7 +101,7 @@ def test_invalid_settings_are_rejected(tmp_path, settings):
     config = dict(raw_ms2_dir=tmp_path, precursor_dir=tmp_path, ms1_library_path=tmp_path / "library.xlsx", output_dir=tmp_path / "out", file_indices=(1,))
     config.update(settings)
     with pytest.raises(ValueError):
-        SphinGOlipIDConfig(**config)
+        SphinGOlipIDConfig(**config,backend="legacy")
 
 
 def _write_inputs(tmp_path, target=500., library_mz=500.):
@@ -110,7 +110,7 @@ def _write_inputs(tmp_path, target=500., library_mz=500.):
     pd.DataFrame({"target": [target], "下限": [target-.1], "上限": [target+.1], "RT": [1.25], "Abund": [1000]}).to_excel(tmp_path / "hilic-msms-1.xlsx", index=False)
     library = tmp_path / "library.xlsx"
     pd.DataFrame({"理论值": [library_mz], "classy": ["Cer"], "name": ["Cer(d34:1)"], "structure": [""]}).to_excel(library, index=False)
-    return SphinGOlipIDConfig.from_single_input_dir(tmp_path, tmp_path / "out", library, file_indices=(1,))
+    return SphinGOlipIDConfig.from_single_input_dir(tmp_path, tmp_path / "out", library, file_indices=(1,),backend="legacy")
 
 
 def test_no_matching_precursor_produces_empty_result(tmp_path):
@@ -129,7 +129,7 @@ def test_numeric_ms1_strings_are_used_after_validation(tmp_path):
 def test_input_output_collision_does_not_modify_input(tmp_path):
     config = _write_inputs(tmp_path)
     original = config.ms1_library_path.read_bytes()
-    config = SphinGOlipIDConfig.from_single_input_dir(tmp_path, tmp_path, config.ms1_library_path, file_indices=(1,), result_pattern="library.xlsx")
+    config = SphinGOlipIDConfig.from_single_input_dir(tmp_path, tmp_path, config.ms1_library_path, file_indices=(1,), result_pattern="library.xlsx",backend="legacy")
     with pytest.raises(InputValidationError, match="overwrite"):
         run_batch(config)
     assert config.ms1_library_path.read_bytes() == original
@@ -169,7 +169,7 @@ def test_mzml_scan_time_seconds_are_normalized():
 
 def test_failed_rt_series_are_not_removed_with_successful_series():
     data = pd.DataFrame({"identification_id": [f"ID{i}" for i in range(6)], "lipid_name": ["Cer(d18:1/20:0)", "Cer(d18:1/21:0)", "Cer(d18:1/22:0)"] + ["SM(d18:1/20:0)"] * 3, "ms1_rt": [10., 10.3, 10.6, 20., 21., 22.]})
-    config = TargetedMzMLConfig(data_dir=Path("."), ms1_library_path=Path("library.xlsx"), output_dir=Path("out"))
+    config = TargetedMzMLConfig(data_dir=Path("."), ms1_library_path=Path("library.xlsx"), output_dir=Path("out"),backend="legacy")
     filtered = apply_rt_fit_filter(data, config)
     assert len(filtered) == 6
     assert set(filtered.loc[filtered.lipid_name.str.startswith("SM"), "rt_validation_status"]) == {"not_evaluated"}

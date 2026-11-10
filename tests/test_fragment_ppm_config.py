@@ -37,7 +37,7 @@ def test_config_reaches_legacy_bounds_and_final_matches(tmp_path, ppm, expected)
     library = tmp_path/"synthetic_library.xlsx"
     synthetic_library().to_excel(library,index=False)
     config = SphinGOlipIDConfig.from_single_input_dir(raw,tmp_path/"out",library,
-        fragment_ppm=ppm,min_matched_fragments=1,min_match_score=0.,save_intermediate=True,file_indices=(1,))
+        fragment_ppm=ppm,min_matched_fragments=1,min_match_score=0.,save_intermediate=True,file_indices=(1,),backend="legacy")
     logger, log = capture_logger()
     result = pd.read_excel(run_one_file(config,1,logger=logger))
     assert result.matched_fragment_count.tolist() == [expected]
@@ -49,7 +49,7 @@ def test_config_reaches_legacy_bounds_and_final_matches(tmp_path, ppm, expected)
 @pytest.mark.parametrize("ppm,expected", [(10,1),(20,2)])
 def test_config_reaches_targeted_generator_matcher_and_summary(tmp_path, ppm, expected):
     config = targeted.TargetedMzMLConfig(tmp_path,tmp_path/"unused.xlsx",tmp_path/"out",
-        fragment_ppm=ppm,min_matched_fragments=1,min_match_score=0.)
+        fragment_ppm=ppm,min_matched_fragments=1,min_match_score=0.,backend="legacy")
     spectrum = targeted.MS2Spectrum(Path("synthetic.mzML"),"scan=1",500.,5.,25.,
         np.array([60.044,481.9894*(1+15/1e6)]),np.array([50.,30.]))
     feature = pd.Series({"feature_id":"synthetic","feature_mz":500.,"ms1_rt":5.})
