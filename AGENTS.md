@@ -9,6 +9,9 @@ The authoritative identification entry points are `engine.py`,
 `reference_pipeline.py`, the GUI and the three CLI commands documented in
 README. They use the isolated reference engine by default. `backend=legacy`
 is an explicit compatibility route, not the scientific production default.
+Keep and improve SphinGOlipID's existing frontend. Do not migrate LipidGate's
+frontend, layouts or Qt application; adapt only the existing UI's backend calls
+and necessary parameter/result fields.
 
 Preserve admission, numeric scores, candidate order and full audit provenance
 when editing storage, exports or interfaces. Retain the matched-fragment-count

@@ -25,6 +25,9 @@ sphingolipid-identify = "sphingolipid_toolkit.identify_cli:main"
 sphingolipid-targeted-mzml = "sphingolipid_toolkit.targeted_mzml_pipeline:main"
 sphingolipid-gui = "sphingolipid_toolkit.gui:main"
 
+[tool.setuptools]
+license-files = ["licenses/LipidGate-MIT.txt"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

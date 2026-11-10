@@ -6,6 +6,8 @@ GUI, text CLI and targeted mzML CLI now use the current LipidGate sphingolipid
 engine through an isolated, attributed snapshot. LipidGate itself is not a
 dependency. Positive and negative sphingolipid libraries are bundled; run
 `git lfs pull` after cloning, then `python -m pip install -e .`.
+The existing SphinGOlipID frontend is retained. LipidGate's frontend is not
+copied; only backend calls and necessary parameter/result fields are adapted.
 
 ```powershell
 sphingolipid-identify sample.mzML --output identifications.xlsx --fragment-ppm 20
