@@ -34,6 +34,15 @@ MODIFIED = {'N-methylSo', 'N,N-dimethylSo', 'ketoSo', '3-keto Cer',
             '1-O-acetyl-Cer', '1-O-acetyl-ω-linoleoyloxy-Cer'}
 
 
+def reference_type_name(name):
+    match=NAME.fullmatch(name)
+    if match:return match['class']
+    if name.startswith('M(IP)2C('):return 'M(IP)2C'
+    # Positional prefixes such as (6-t...) describe a modified composition;
+    # they must not create a separate type for every carbon/DB combination.
+    return name.split('(',1)[0]
+
+
 def build(catalog, index, output, audit, aliases_output, types_output):
     catalog, index, output, audit, aliases_output, types_output = map(
         Path, (catalog, index, output, audit, aliases_output, types_output))
@@ -69,8 +78,7 @@ def build(catalog, index, output, audit, aliases_output, types_output):
         formula, name = row[0], row[3]
         if (name,formula) in seen: continue
         seen.add((name,formula))
-        match=NAME.fullmatch(name)
-        head=match['class'] if match else re.split(r'\([mdtq]\d+:',name,maxsplit=1)[0]
+        head=reference_type_name(name)
         cls=aliases.get(head,'')
         canonical_by_type[head]=cls
         if cls: aliases_by_class[cls].add(head)

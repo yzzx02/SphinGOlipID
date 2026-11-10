@@ -39,6 +39,10 @@
     "upstream_sha256": "93f4de76c1487e7452d257149cfe9a43b4b1f0b53235129952c5b6f71493bb19",
     "ported_sha256": "f1ae7255ba7750cb13bf88210147991561ef218eaecac2dffd6dba20486c0ea7"
   },
+  "tests/ms2/test_sphingolipid_name_catalog.py": {
+    "upstream_sha256": "1e5e5bf58f08f8e75886a8e58b18989ce91fdf0a69598ecec17fea7b3d08af14",
+    "ported_sha256": "1e5e5bf58f08f8e75886a8e58b18989ce91fdf0a69598ecec17fea7b3d08af14"
+  },
   "tests/ms2/test_positive_ganglioside.py": {
     "upstream_sha256": "05e7dd082ba78e779f8eed5038bac22aa09a01e7ee577d815537e2e50aa27853",
     "ported_sha256": "fe9aaf6fac9503c149614b338aa9f704cd28908ad1712c06c93a186c37ddf21d"
@@ -84,7 +88,7 @@
     "ported_sha256": "b09329e5eb855996191f60445bac4b704a20abc900e7218e1cb1263bcf13da8a"
   },
   "scripts/build_sphingolipid_name_catalog.py": {
-    "upstream_sha256": "82cc87918a77acf9f01773d4b3568ca81477ec01ef83658d32130ef0ae594fd0",
-    "ported_sha256": "451bce3ccf51cde594ab28ca7b2ae4ff33eba7ed564b2776b376aaee88e4a48f"
+    "upstream_sha256": "25d9a8b1acb035e0fcd4c42e22ac0cf352df372bdc3ad0fd32c8679db0d959ec",
+    "ported_sha256": "090531d070a5f35cdd981573cbb9b558a27198f6a36ec2dd924cd4fb08111331"
   }
 }
