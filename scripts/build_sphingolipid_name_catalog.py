@@ -30,7 +30,7 @@ except ModuleNotFoundError:
     from extend_positive_catalog_glycosphingolipid_library import read_catalog, NAME
 
 ELEMENTS = {'C':C, 'H':H, 'N':N, 'O':O, 'P':P, 'S':31.9720711744}
-MODIFIED = {'N-methylSo', 'N,N-dimethylSo', 'ketoSo', '3-keto Cer',
+MODIFIED = {'N-methylSo', 'ketoSo', '3-keto Cer',
             '1-O-acetyl-Cer', '1-O-acetyl-ω-linoleoyloxy-Cer'}
 
 
@@ -41,6 +41,22 @@ def reference_type_name(name):
     # Positional prefixes such as (6-t...) describe a modified composition;
     # they must not create a separate type for every carbon/DB combination.
     return name.split('(',1)[0]
+
+
+def reviewed_reference_formula(reference_type, formula):
+    """Return reviewed composition and provenance without rewriting source rows."""
+    if reference_type!='LM1':return formula,''
+    tokens=re.findall(r'([A-Z][a-z]?)(\d*)',formula)
+    if ''.join(a+b for a,b in tokens)!=formula or any(a not in 'CHNO' for a,b in tokens):
+        raise ValueError('Review unexpected LM1 reference formula before correction')
+    counts={a:int(b or 1) for a,b in tokens}
+    if counts.get('N')!=2:
+        raise ValueError('LM1 correction requires the reviewed two-nitrogen legacy formula')
+    for element,count in zip('CHNO',(11,17,1,8)):
+        counts[element]=counts.get(element,0)+count
+    corrected=''.join(element+(str(counts[element]) if counts[element]!=1 else '')
+        for element in 'CHNO' if counts.get(element))
+    return corrected,'LM1_add_missing_NeuAc_residue;doi:10.3390/ijms22168844'
 
 
 def build(catalog, index, output, audit, aliases_output, types_output):
@@ -75,7 +91,8 @@ def build(catalog, index, output, audit, aliases_output, types_output):
     aliases_by_class = defaultdict(set)
     canonical_by_type = {}
     for row in rows:
-        formula, name = row[0], row[3]
+        original_formula, name = row[0], row[3]
+        formula,correction=reviewed_reference_formula(reference_type_name(name),original_formula)
         if (name,formula) in seen: continue
         seen.add((name,formula))
         head=reference_type_name(name)
@@ -89,9 +106,10 @@ def build(catalog, index, output, audit, aliases_output, types_output):
         if not valid:status='invalid_reference_formula'
         elif name.startswith('myriocin'):status='not_a_sphingolipid'
         elif head=='N,N,N-trimethylSo':
-            status='reference_only_unverified_adduct'
-            value=None
-        elif head=='LM1':status='reference_name_formula_conflict'
+            status='reference_only_insufficient_structural_signature'
+            value=value-PROTON-0.000548579909065 if value is not None else None
+            correction='intrinsic_monocation_[M]+;doi:10.1371/journal.pone.0144817'
+        elif head=='LM1':status='reference_only_verified_composition_unresolved_linkage'
         elif head in MODIFIED:status='reference_only_ambiguous_modification'
         elif cls:
             values=ester_masses if head in {'ω-linoleoyloxy-Cer','ω-linoleoyloxy-DHCer'} else masses[cls]
@@ -101,7 +119,9 @@ def build(catalog, index, output, audit, aliases_output, types_output):
         counts[status]+=1
         by_type[head][status]+=1
         records.append(dict(reference_name=name,formula=formula,precursor_mz=f'{value:.8f}' if value else '',
-            adduct='[M+H]+' if value else '',canonical_class=cls,coverage_status=status))
+            adduct=('[M]+' if head=='N,N,N-trimethylSo' else '[M+H]+') if value else '',
+            canonical_class=cls,coverage_status=status,original_formula=original_formula if correction else '',
+            reference_correction=correction))
     output.parent.mkdir(parents=True,exist_ok=True)
     with output.open('wb') as binary,gzip.GzipFile(filename='',fileobj=binary,mode='wb',mtime=0,compresslevel=9) as compressed,io.TextIOWrapper(compressed,encoding='utf-8',newline='') as handle:
         writer=csv.DictWriter(handle,fieldnames=list(records[0]))

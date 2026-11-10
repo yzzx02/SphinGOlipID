@@ -1,0 +1,173 @@
+{
+  "revision": "sphingolipid-literature-20261110-r1",
+  "review_date": "2026-11-10",
+  "previous_checkpoint": "6758e5a0ca9f831cfdfba3299fe8de054087e70d",
+  "enabled_types": 1,
+  "reference_only_types": 7,
+  "measured_benchmark_recall_claimed": false,
+  "original_catalog_rewritten": false,
+  "original_lipidgate_libraries_changed": false,
+  "references": {
+    "dms": {
+      "doi": "10.1038/nprot.2013.004",
+      "pmid": "23391889",
+      "title": "Liquid chromatography quadrupole time-of-flight mass spectrometry characterization of metabolites guided by the METLIN database",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3666335/",
+      "location": "Fig. 7b; native positive ESI-CID, 20 and 40 V"
+    },
+    "lm1": {
+      "doi": "10.3390/ijms22168844",
+      "title": "Ganglioside Composition Distinguishes Anaplastic Ganglioglioma Tumor Tissue from Peritumoral Brain Tissue: Complementary Mass Spectrometry and Thin-Layer Chromatography Evidence",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8396361/",
+      "location": "Ganglioside nomenclature; LM1 and nLM1 are distinct lacto/neolacto structures"
+    },
+    "lm1_ms": {
+      "doi": "10.1016/j.femsim.2005.03.007",
+      "pmid": "16051069",
+      "title": "Nontypeable Haemophilus influenzae-binding gangliosides of human respiratory (HEp-2) cells have a requisite lacto/neolacto core structure",
+      "url": "https://academic.oup.com/femspd/article/45/2/171/646673"
+    },
+    "trimethyl": {
+      "doi": "10.1371/journal.pone.0144817",
+      "pmid": "26660097",
+      "title": "Quantitative Profiling of Long-Chain Bases by Mass Tagging and Parallel Reaction Monitoring",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4684364/",
+      "location": "Fig. 2B and S5B; synthetic native trimethyl-C18-sphingosine control, product m/z 60.08"
+    },
+    "acetyl": {
+      "doi": "10.3390/md19110585",
+      "title": "Heterocornols from the Sponge-Derived Fungus Pestalotiopsis heterocornis with Anti-Inflammatory Activity",
+      "url": "https://www.mdpi.com/1660-3397/19/11/585",
+      "location": "Compound 9, Fig. 5; structural NMR/HRESIMS, key fragmentation explicitly EI-MS"
+    },
+    "double_acyl": {
+      "doi": "10.1007/s00216-019-02301-3",
+      "title": "Comprehensive characterization and simultaneous analysis of overall lipids in reconstructed human epidermis using NPLC/HR-MSn: 1-O-E (EO) Cer, a new ceramide subclass",
+      "url": "https://doi.org/10.1007/s00216-019-02301-3",
+      "location": "Long to very long chain 1-O-acyl, not literal 1-O-acetyl"
+    },
+    "keto_cer": {
+      "doi": "10.1093/hmg/ddab309",
+      "pmid": "34686882",
+      "title": "Formation of keto-type ceramides in palmoplantar keratoderma based on biallelic KDSR mutations in patients",
+      "url": "https://academic.oup.com/hmg/article/31/7/1105/6408935",
+      "location": "Fig. 4 and synthesis of saturated NdK standards; not validation of the complete old keto-Cer series"
+    },
+    "keto_so": {
+      "url": "https://hmdb.ca/metabolites/HMDB0245914",
+      "title": "3-Ketosphingosine HMDB0245914",
+      "location": "Structure/formula reference; displayed LC-MS/MS entries are predicted, not native standard validation"
+    }
+  },
+  "decisions": [
+    {
+      "original_type": "1-O-acetyl-Cer",
+      "ms2_enabled": false,
+      "decision": "reference_only",
+      "evidence": [
+        "acetyl"
+      ],
+      "reason": "Existence and acetyl site supported by NMR, but the cited diagnostic fragments are EI-MS. Do not transfer them into native ESI gates or reinterpret long O-acyl as acetyl."
+    },
+    {
+      "original_type": "1-O-acetyl-ω-linoleoyloxy-Cer",
+      "ms2_enabled": false,
+      "decision": "reference_only",
+      "evidence": [
+        "double_acyl"
+      ],
+      "reason": "Primary work defines 1-O-acyl omega-linoleoyloxy ceramides with long acyls; it does not validate the literal acetyl name and formulas in the historical list."
+    },
+    {
+      "original_type": "3-keto Cer",
+      "ms2_enabled": false,
+      "decision": "reference_only",
+      "evidence": [
+        "keto_cer"
+      ],
+      "reason": "Saturated 3-ketodihydroceramides (NdK) have experimental evidence including the C18 m/z 270 channel. Do not apply this to the unresolved old keto-Cer grid or its unsaturated forms without a separate composition/site review."
+    },
+    {
+      "original_type": "LM1",
+      "ms2_enabled": false,
+      "decision": "reference_formula_corrected_only",
+      "evidence": [
+        "lm1",
+        "lm1_ms"
+      ],
+      "verified_name": "LM1 / 3'-isoLM1, IV3-alpha-Neu5Ac-Lc4Cer; distinct from nLM1 (Neu5Ac-nLc4Cer)",
+      "glycan_composition": "Hex3HexNAcNeuAc",
+      "formula_delta": {
+        "C": 11,
+        "H": 17,
+        "N": 1,
+        "O": 8
+      },
+      "example_before": "C60H110N2O23",
+      "example_after": "C71H127N3O31",
+      "reason": "Correct missing NeuAc in the independent reference catalog. Composition matches the GM1 elemental family, but shared Y/B products do not establish lacto/neolacto/ganglio linkage; no direct GM1 alias is enabled."
+    },
+    {
+      "original_type": "N,N,N-trimethylSo",
+      "ms2_enabled": false,
+      "decision": "reference_ion_corrected_only",
+      "evidence": [
+        "trimethyl"
+      ],
+      "verified_adduct": "[M]+",
+      "mass_correction": "Formula atomic mass minus electron mass, not plus proton",
+      "reason": "Intrinsic monocation and the native trimethylaminium product are verified. A common m/z 60 head alone is insufficient for a conservative independent sphingoid-backbone gate."
+    },
+    {
+      "original_type": "N,N-dimethylSo",
+      "ms2_enabled": true,
+      "decision": "enabled_single_standard_composition",
+      "evidence": [
+        "dms"
+      ],
+      "enabled_name": "N,N-dimethylSo(d18:1)",
+      "formula": "C20H41NO2",
+      "adduct": "[M+H]+",
+      "hg_peaks": [
+        58.0651,
+        84.0808,
+        110.0964
+      ],
+      "hg_minimum": 2,
+      "mandatory_hg": 110.0964,
+      "other_peaks": [
+        96.0808,
+        280.2999,
+        292.2999,
+        310.3104,
+        328.321
+      ],
+      "weights": {
+        "HG": 60,
+        "Other": 40
+      },
+      "mass_basis": "Elemental assignments inferred from three-decimal published masses, including ionic electron correction; theoretical equal library intensities, not measured intensities",
+      "other_minimum_raw_fraction_exclusive": 0.005,
+      "other_admission_gate": false,
+      "reporting": "Single-base composition; no FA chain upgrade, double-bond position or stereochemical assignment",
+      "scope": "Only the experimentally documented d18:1 composition; no methylated-base homolog grid"
+    },
+    {
+      "original_type": "N-methylSo",
+      "ms2_enabled": false,
+      "decision": "reference_only",
+      "evidence": [],
+      "reason": "No suitable native positive standard spectrum with a verified N-monomethyl-specific gate was established in this review. Do not infer N-methylation from precursor formula and shared dehydration alone."
+    },
+    {
+      "original_type": "ketoSo",
+      "ms2_enabled": false,
+      "decision": "reference_only",
+      "evidence": [
+        "keto_so",
+        "keto_cer"
+      ],
+      "reason": "Do not confuse unsaturated 3-ketosphingosine with saturated 3-ketosphinganine, or prediction/derivatization spectra with native positive CID. No unsaturated ketoSo gate is enabled."
+    }
+  ]
+}

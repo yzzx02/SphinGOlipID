@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 — 2026-11-10
+
+- Add only the native-CID-verified d18:1 DMS composition with a two-HG gate including 110.0964, reusing HG/Other 60/40.
+- Correct LM1 reference formulas/masses and trimethylSo intrinsic ion masses; keep seven rare types reference-only.
+- Freshly rebuild and verify independent indexes with stable IDs and all previous scientific fields preserved; retain original libraries and migration checkpoint.
+
 ## 0.5.0 — 2026-11-10
 
 - All identification entry points use the current migrated sphingolipid engine,

@@ -115,7 +115,7 @@ class SphingolipidIdentifier:
             row['reference_class_aliases']='; '.join(reference_aliases_for_class(row['compound_class']))
             row['annotation_engine'] = 'SphinGOlipID'
             row['engine_upstream'] = 'LipidGate'
-            row['engine_revision'] = 'sphingolipid-migration-20261110'
+            row['engine_revision'] = 'sphingolipid-literature-20261110-r1'
             row['ms1_tolerance_ppm'] = self.config.precursor_ppm
             row['ms2_tolerance_ppm'] = self.config.fragment_ppm
             row['ms2_tolerance_da'] = self.config.fragment_da

@@ -60,3 +60,18 @@ Run `python -m pytest -q` after functional changes. Keep algorithm and library
 commits independently traceable. Use Git LFS for MSP, SQLite and compressed
 reference-name assets; state their sizes before pushing. Never commit raw
 samples, research outputs, caches or builds. Preserve existing unrelated edits.
+
+
+Local literature checkpoint: `sphingolipid-literature-20261110-r1`, documented
+in `config/scientific_revision_literature_20261110.json`. Keep the attributed
+migration manifest unchanged. The only scientific snapshot deviation is the
+documented DMS extension; do not blindly overwrite it from upstream.
+Native DMS coverage is only N,N-dimethylSo(d18:1) [M+H]+. Require at least two
+distinct HG observations among 58.0651/84.0808/110.0964, including 110.0964.
+Use strongest HG, HG/Other 60/40, raw Other >0.5%, no Other/LCB gate or fallback;
+retain existing support saturation and candidate ranking. Never open a DMS
+homolog grid or reinterpret these masses as the ordinary d/t LCB interface.
+LM1's reference formulas include the missing NeuAc residue and remain separate
+from nLM1/GM1 linkage claims. TrimethylSo reference masses are intrinsic [M]+;
+the single common 60.08 amine does not enable MS2 coverage. The other rare
+types remain archived references, outside default identification candidates.

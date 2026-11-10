@@ -103,6 +103,8 @@ def legacy_candidates(rows):
         match=NAME.fullmatch(row[3])
         if match is None or match['class'] not in LEGACY_ALIASES:continue
         cls=LEGACY_ALIASES[match['class']]
+        if cls=='N,N-dimethylSo' and (match['series'],int(match['c']),int(match['db']))!=('d',18,1):
+            continue  # Native CID standard only; no methylated-base grid.
         if cls=='KetoSPB' and (match['series'],int(match['c']),int(match['db']))!=('d',18,0):
             continue  # Primary-standard 3KDS coverage; no unverified keto grid.
         tokens=re.findall(r'([A-Z][a-z]?)(\d*)',row[0])

@@ -48,7 +48,7 @@ policy; equal scores do not override the matched-fragment-count split.
 
 ## One current backend
 
-Version 0.5.0 retires the notebook/coverage backend and the separate experimental
+Version 0.5.0 retired the notebook/coverage backend and the separate experimental
 multi-evidence scorer. Every formal entry point, including the compatibility
 constructor `MS2PipelineConfig`, now invokes the same current engine.
 `backend="legacy"` and old absolute-intensity, global matched-count and 0–1
@@ -100,12 +100,12 @@ file; aggregate outputs preserve relative evidence-file references.
 
 The historical 85,710-row MS1 list is a type/name crosswalk, not a library-size
 target or an identification candidate grid. Current eligible chain combinations
-remain authoritative. Of 112 retained sphingolipid type names, 104 have current
-MS2 class/family coverage; eight remain reference-only. This is type availability,
+remain authoritative. Of 112 retained sphingolipid type names, 105 have current
+MS2 class/family coverage (DMS only at d18:1); seven remain reference-only. This is type availability,
 not measured recall, exact-isomer resolution or coverage of every historical
 composition. Myriocin is archived separately as non-sphingolipid.
 See [the complete type audit](docs/sphingolipid_type_coverage.md) and
-[the eight deferred types](docs/pending_sphingolipid_types_20261110.md).
+[the eight-type literature review](docs/sphingolipid_literature_review_20261110.md).
 
 ## Retained RT and review tools
 
@@ -127,3 +127,14 @@ Continue on `codex/lipidgate-sphingolipid-migration`; do not merge into main
 without an explicit user request. Preserve the original HG2/B2 reference and
 published checkpoints. Scientific code and library revisions are independently
 traceable. Raw samples, research outputs, caches and builds stay untracked.
+
+
+## Literature revision 2026-11-10
+
+Version 0.5.1 adds one native-CID-supported N,N-dimethylSo(d18:1) composition,
+requiring two N-related HG products including 110.0964 with HG/Other 60/40.
+The independent reference catalog corrects LM1's missing NeuAc residue and
+trimethylSo's intrinsic [M]+ ion; these remain reference-only, without a direct
+GM1 alias or a permissive single-amine gate. No other rare-type grid is added.
+Existing classes retain their fragments, evidence rules, scores and ranking.
+The local scientific revision is separate from the immutable migration manifest.

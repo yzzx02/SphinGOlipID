@@ -107,6 +107,8 @@
     "type IV H": "Hex4HexNAcFucCer",
     "ω-linoleoyloxy-Cer": "Cer",
     "ω-linoleoyloxy-DHCer": "Cer",
-    "ω-linoleoyloxy-GlcCer": "AHexCer"
-  }
+    "ω-linoleoyloxy-GlcCer": "AHexCer",
+    "N,N-dimethylSo": "N,N-dimethylSo"
+  },
+  "review_revision": "sphingolipid-literature-20261110-r1"
 }

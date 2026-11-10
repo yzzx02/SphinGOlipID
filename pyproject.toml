@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sphingolipid-toolkit"
-version = "0.5.0"
+version = "0.5.1"
 description = "SphinGOlipID sphingolipid identification with fragment-pool evidence gates"
 requires-python = ">=3.10"
 dependencies = [
