@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sphingolipid-toolkit"
-version = "0.5.1"
+version = "0.6.0"
 description = "SphinGOlipID sphingolipid identification with fragment-pool evidence gates"
 requires-python = ">=3.10"
 dependencies = [
@@ -24,6 +24,7 @@ sphingolipid-ms2 = "sphingolipid_toolkit.cli:main"
 sphingolipid-identify = "sphingolipid_toolkit.identify_cli:main"
 sphingolipid-targeted-mzml = "sphingolipid_toolkit.targeted_mzml_pipeline:main"
 sphingolipid-gui = "sphingolipid_toolkit.gui:main"
+sphingolipid-untargeted = "sphingolipid_toolkit.untargeted_cli:main"
 
 [tool.setuptools]
 license-files = ["licenses/LipidGate-MIT.txt"]
@@ -32,7 +33,7 @@ license-files = ["licenses/LipidGate-MIT.txt"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-sphingolipid_toolkit = ["gui_assets/*.png", "data/*.json", "data/*.csv.gz", "data/ms2/*.sqlite", "data/ms2/*.msp.gz"]
+sphingolipid_toolkit = ["gui_assets/*.png", "r/*.R", "data/*.json", "data/*.csv.gz", "data/ms2/*.sqlite", "data/ms2/*.msp.gz"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

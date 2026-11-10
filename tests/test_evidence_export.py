@@ -112,3 +112,32 @@ def test_repeated_evidence_references_are_hashed_once_per_source(tmp_path, monke
     monkeypatch.setattr(result_writer, '_file_digest', count)
     result_writer.copy_identification_bundle(source, tmp_path / 'saved' / 'result.xlsx')
     assert calls.count(sidecar.resolve()) == 1
+
+
+def test_multisheet_export_preserves_complete_distinct_evidence_and_numeric_scores(tmp_path):
+    first=json.dumps({'spectrum':'x'*40000},separators=(',',':'))
+    second=json.dumps({'spectrum':'y'*40000},separators=(',',':'))
+    tables={'annotations':pd.DataFrame({'ms2_evidence_json':[first],'total_score':[88.1234],'rank':[1]}),
+        'spectrum_matches':pd.DataFrame({'ms2_evidence_json':[first,second],'total_score':[88.1234,77.6],'rank':[1,2]}),
+        'features':pd.DataFrame({'xcms_peak_id':['CP1'],'peak_area':[123456.789]})}
+    path=tmp_path/'result.xlsx'
+    result_writer.write_identification_workbook(tables,path)
+    selected=pd.read_excel(path,sheet_name='annotations')
+    all_matches=pd.read_excel(path,sheet_name='spectrum_matches')
+    assert selected.evidence_file.iloc[0]==all_matches.evidence_file.iloc[1]
+    payload=json.loads(gzip.decompress((path.parent/selected.evidence_file.iloc[0]).read_bytes()))
+    assert set(payload.values())=={first,second}
+    assert all_matches.total_score.tolist()==[88.1234,77.6]
+    assert all_matches['rank'].tolist()==[1,2]
+    assert tables['annotations'].ms2_evidence_json.iloc[0]==first
+
+
+def test_failed_multisheet_export_keeps_previous_output_and_cleans_artifacts(tmp_path,monkeypatch):
+    path=tmp_path/'result.xlsx'
+    path.write_bytes(b'previous result')
+    def fail(*args,**kwargs):raise PermissionError('workbook open')
+    monkeypatch.setattr(result_writer.pd,'ExcelWriter',fail)
+    with pytest.raises(PermissionError):
+        result_writer.write_identification_workbook({'annotations':pd.DataFrame({'ms2_evidence_json':['x'*40000]})},path)
+    assert path.read_bytes()==b'previous result'
+    assert list(tmp_path.iterdir())==[path]

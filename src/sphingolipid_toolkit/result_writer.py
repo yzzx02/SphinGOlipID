@@ -4,26 +4,29 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
-from tempfile import TemporaryDirectory
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 from openpyxl import load_workbook
+import pandas as pd
 
 from .io_utils import write_excel_atomic
 
 
-def write_identifications(data,path):
+def _prepare_evidence_tables(tables, path):
     path=Path(path)
-    output=data.copy()
+    prepared={name: data.copy() for name,data in tables.items()}
     evidence={}
-    external_indices=[]
-    if 'ms2_evidence_json' in output:
+    external_indices={name: [] for name in tables}
+    for name,output in prepared.items():
+        if 'ms2_evidence_json' not in output:
+            continue
         for index,value in output['ms2_evidence_json'].items():
             if isinstance(value,str) and len(value)>32767:
                 key=hashlib.sha256(value.encode('utf-8')).hexdigest()
                 evidence[key]=value
                 output.loc[index,'ms2_evidence_json']=json.dumps({'external_evidence_sha256':key},separators=(',',':'))
                 output.loc[index,'evidence_sha256']=key
-                external_indices.append(index)
+                external_indices[name].append(index)
     created=None
     if evidence:
         payload=json.dumps(evidence,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode('utf-8')
@@ -36,14 +39,44 @@ def write_identifications(data,path):
         else:
             with sidecar.open('xb') as handle:handle.write(gzip.compress(payload,mtime=0))
             created=sidecar
-        mask=output.index.isin(external_indices)
-        output.loc[mask,'evidence_file']=sidecar.name
+        for name,indices in external_indices.items():
+            if indices:
+                prepared[name].loc[prepared[name].index.isin(indices),'evidence_file']=sidecar.name
+    return prepared,created
+
+
+def write_identifications(data,path):
+    path=Path(path)
+    prepared,created=_prepare_evidence_tables({'Sheet1': data},path)
     try:
-        write_excel_atomic(output,path,index=False)
+        write_excel_atomic(prepared['Sheet1'],path,index=False)
     except BaseException:
         if created is not None and created.resolve().parent==path.resolve().parent:
             created.unlink(missing_ok=True)
         raise
+    return path
+
+
+def write_identification_workbook(tables, path):
+    """Atomically export all result tables with one complete shared evidence file."""
+    path=Path(path)
+    prepared,created=_prepare_evidence_tables(tables,path)
+    temporary=None
+    try:
+        path.parent.mkdir(parents=True,exist_ok=True)
+        with NamedTemporaryFile(dir=path.parent,prefix='.sphingolipid_result_',suffix='.xlsx',delete=False) as handle:
+            temporary=Path(handle.name)
+        with pd.ExcelWriter(temporary,engine='openpyxl') as writer:
+            for name,data in prepared.items():
+                data.to_excel(writer,sheet_name=name,index=False)
+        temporary.replace(path)
+    except BaseException:
+        if created is not None:
+            created.unlink(missing_ok=True)
+        raise
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
     return path
 
 

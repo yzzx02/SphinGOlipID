@@ -16,17 +16,29 @@ Python 3.10 or later is required. Compressed MSP files, SQLite indexes and the
 historical reference-name catalog are tracked by Git LFS and bundled in the
 package. An incomplete or fingerprint-mismatched bundled index is rejected.
 
+The non-targeted desktop workflow also requires R with `xcms`, `MSnbase`,
+`mzR`, `jsonlite` and `BiocParallel`. Add `Rscript` to PATH; Windows installations
+under `Program Files/R` are also detected. There is no silent detector fallback.
+XCMS 4.8.0 / R 4.5.2 is the locally validated combination.
+
 ## Identify
 
 ```powershell
 sphingolipid-gui
+sphingolipid-untargeted sample1.mzML sample2.mzML --output results.xlsx
 sphingolipid-identify sample.mzML --output identifications.xlsx --fragment-ppm 20
 sphingolipid-ms2 --input-dir RAW --precursor-dir TARGETS --output-dir RESULTS --files 1-6
 sphingolipid-targeted-mzml --data-dir DATA --output-dir RESULTS --fragment-da 0.3
 ```
 
-The original Tkinter setup and review interface is retained. It calls the same
-current engine as the text and mzML commands. Text input uses paired
+The original Tkinter setup and review layout is retained. Select one or more
+centroided mzML files containing MS1/MS2 and an output XLSX path; no target table
+is required. XCMS centWave extracts each file's actual local MS1 chromatographic
+peaks serially. Peak-width limits (seconds), noise and S/N are editable, along
+with MS1 tolerance, MS2 tolerance (ppm or Da), minimum score and Top-N. The MS1
+tolerance also supplies centWave's consecutive-scan ROI ppm setting.
+The GUI uses the same current MS2 engine as the text and mzML commands.
+The separate historical text command still uses paired
 `hilic-msms-{i}.txt` and `hilic-msms-{i}.xlsx` target tables; the two folders can
 be supplied separately. Targeted mzML input uses mzML files and targetlist CSVs.
 `sphingolipid-identify` can identify native mzML directly without those targetlists.
@@ -41,6 +53,22 @@ workbook is required for current matching.
 | Absolute fragment tolerance | `--fragment-da` replaces ppm |
 | Minimum total score | 50 / 100 |
 | Candidates requested | 3; existing score/count ranking and ties retained |
+
+For the desktop / `sphingolipid-untargeted` workflow, Top-N defaults to **1**.
+Its centWave settings default to peakwidth 5–60 s, noise 1000, S/N 3,
+prefilter `(3, noise)`, MS1/ROI tolerance 10 ppm and mzdiff −0.001.
+These are application defaults; they do not claim to be the upstream XCMS
+defaults. Positive mode is selected initially; negative mode can be selected.
+See [centWave parameter documentation](https://sneumann.github.io/xcms/reference/findChromPeaks-centWave.html).
+
+No cross-file alignment or gap filling is performed. Local XCMS peak IDs,
+measured boundaries and areas are retained. Apex RT, intensity and centroid m/z
+are measured from the MS1 EIC inside those boundaries. An acquired MS2 needs a
+confirmed measured preceding MS1 and one unambiguous local peak of the same
+file and polarity. Missing detection never creates an MS2-only feature.
+Each feature retains the native candidate order from one best acquired
+spectrum, chosen by its first-ranked score, matched-fragment count, then
+acquisition order. Fragments from different scans are never combined.
 
 The defaults above preserve existing workflow choices. Actual tolerances are
 recorded in results. Use `--top-n 1` to request Top1 under the current ranking
@@ -97,6 +125,14 @@ reporting resolution and `ms2_evidence_json`. Compatibility columns support the
 existing review and RT tools without rescoring candidates. Excel cells exceeding
 the format limit retain complete evidence in an adjacent content-addressed JSON
 file; aggregate outputs preserve relative evidence-file references.
+
+The non-targeted workbook contains `annotations` (one selected acquisition per
+local feature, with its Top-N candidates), `features` (all detected local peaks,
+including unannotated peaks), `spectrum_matches` (every passing acquired-spectrum
+result), `spectrum_audit` (local-association decisions), `parameters` and
+`input_files` (actual R/XCMS versions and source paths). Scores, gates, native
+scan IDs, ranking and full MS2 evidence remain unchanged. Keep adjacent
+`ms2-evidence-*.json.gz` files with the workbook; GUI Save As copies the bundle.
 
 The historical 85,710-row MS1 list is a type/name crosswalk, not a library-size
 target or an identification candidate grid. Current eligible chain combinations

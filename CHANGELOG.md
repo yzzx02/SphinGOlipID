@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 — 2026-11-10
+
+- Retain the existing desktop layout and replace mandatory TXT/target-table
+  inputs with multiple mzML files and one output XLSX; default to XCMS centWave.
+- Expose peak-width limits, noise, S/N, positive/negative polarity and ppm/Da
+  MS2 tolerance. Process files serially without alignment or gap filling.
+- Retain native local peak IDs, areas, measured EIC apices, per-spectrum
+  evidence and native ranking. Export features, annotations, all spectrum
+  matches, association audit, exact settings and actual dependency versions.
+- Add the independent `sphingolipid-untargeted` command and packaged R runner;
+  original scientific libraries, pool rules, gates and score calculations remain
+  unchanged.
 
 - Use the displayed 0–100 total-score scale for GUI result filtering, including
   current total-score-only workbooks and read-only aliases for older results.

@@ -15,13 +15,12 @@ from typing import Any, Mapping
 
 import pandas as pd
 
-from .config import SphinGOlipIDConfig
-from .ms2_pipeline import run_batch
+from .untargeted import UntargetedConfig, run_untargeted
 from .result_writer import copy_identification_bundle
 from .scoring import add_standard_score_columns
 
 
-APP_TITLE = "鞘脂质谱数据智能解析软件"
+APP_TITLE = "SphinGOlipID · 非靶向鞘脂鉴定"
 BACKGROUND = "#f3f6fb"
 INK = "#182b46"
 MUTED = "#64748b"
@@ -30,23 +29,32 @@ ACCENT = "#2563eb"
 # Field, label, spinner bounds, increment, numeric type.
 PARAMETERS = (
     ("fragment_ppm", "碎片容差 (ppm)", 0.1, 1000, 1, float),
-    ("precursor_ppm", "前体容差 (ppm)", 0.1, 1000, 1, float),
+    ("precursor_ppm", "MS1 容差 (ppm)", 0.1, 1000, 1, float),
     ("min_total_score", "最低总分 (0–100)", 0, 100, 1, float),
     ("top_n", "每个前体保留 Top-N", 1, 1000, 1, int),
+    ("peakwidth_min", "最小峰宽 (秒)", 0.1, 1000, 1, float),
+    ("peakwidth_max", "最大峰宽 (秒)", 0.1, 1000, 1, float),
+    ("noise", "噪声阈值 (强度)", 0, 1000000000, 100, float),
+    ("snthresh", "信噪比 (S/N)", 0.1, 10000, 1, float),
 )
 NAME_COLUMNS = ("lipid_name", "注释", "name", "annotation", "Lipid")
 SCORE_COLUMNS = ("total_score", "ms2_match_score", "匹配度分数")
 RESULT_FIELDS = (
     (("lipid_name", "注释", "name", "annotation"), "脂质名称", 240),
     (("observed_mz", "target"), "前体 m/z", 110),
+    (("apex_rt_min",), "峰顶 RT (min)", 130),
     (("observed_rt", "RT"), "保留时间 (min)", 130),
     (("total_score", "ms2_match_score", "匹配度分数"), "MS2 总分 (0–100)", 150),
     (("rank",), "候选排名", 90),
     (("matched_fragment_count",), "匹配碎片数", 110),
     (("signal_intensity", "Abund"), "信号强度", 120),
-    (("source_result_file",), "来源文件", 180),
+    (("xcms_peak_id",), "XCMS 峰编号", 120),
+    (("source_file", "source_result_file"), "来源文件", 180),
 )
 STAGES = (
+    ("Detecting MS1 peaks", "XCMS 提取 MS1 色谱峰"),
+    ("Measuring MS1 peak apices", "测量实际峰顶与峰强度"),
+    ("Matching acquired MS2", "关联 MS2 并鉴定鞘脂"),
     ("Loading MS1", "加载 MS1 数据库"),
     ("Validating inputs", "校验输入文件"),
     ("Reading MS2", "读取原始 MS/MS 数据"),
@@ -61,10 +69,8 @@ STAGES = (
 
 @dataclass
 class FileSelection:
-    txt_file: Path | None = None
-    precursor_file: Path | None = None
-    ms1_db_file: Path | None = None
-    output_dir: Path | None = None
+    mzml_files: tuple[Path, ...] = ()
+    output_file: Path | None = None
 
 
 def parse_matching_parameters(values: Mapping[str, str]) -> dict[str, float | int]:
@@ -75,14 +81,18 @@ def parse_matching_parameters(values: Mapping[str, str]) -> dict[str, float | in
         removed_backend()
     for key,label,_low,_high,_step,numeric_type in PARAMETERS:
         try:
-            value = numeric_type(values[key].strip())
+            value = numeric_type(str(values[key]).strip())
         except (KeyError, TypeError, ValueError, OverflowError) as exc:
             unit = "整数" if numeric_type is int else "数值"
             raise ValueError(f"{label}须填写有效的{unit}。") from exc
         if not math.isfinite(value):
             raise ValueError(f"{label}须填写有限数值。")
         if key in {"fragment_ppm", "precursor_ppm"} and value <= 0:
-            raise ValueError("碎片容差须大于 0 ppm。")
+            raise ValueError("匹配容差须大于 0。")
+        if key in {"peakwidth_min", "peakwidth_max", "snthresh"} and value <= 0:
+            raise ValueError(f"{label}须大于零。")
+        if key == "noise" and value < 0:
+            raise ValueError("噪声阈值不能为负数。")
         if key == "min_fragment_intensity" and value < 0:
             raise ValueError("最低碎片强度不能为负数。")
         if key in {"min_matched_fragments", "top_n"} and value < 1:
@@ -92,6 +102,8 @@ def parse_matching_parameters(values: Mapping[str, str]) -> dict[str, float | in
         if key == 'min_total_score' and not 0 <= value <= 100:
             raise ValueError('最低总分须在 0 到 100 之间。')
         parsed[key] = value
+    if parsed["peakwidth_min"] >= parsed["peakwidth_max"]:
+        raise ValueError("最小峰宽须小于最大峰宽，单位为秒。")
     return parsed
 
 
@@ -174,11 +186,15 @@ class SphinGOlipIDApp:
 
         self.path_vars = {key: tk.StringVar(value="未选择") for key in FileSelection.__dataclass_fields__}
         self.parameter_vars = {
-            key: tk.StringVar(value=str(SphinGOlipIDConfig.__dataclass_fields__[key].default))
+            key: tk.StringVar(value=str(UntargetedConfig.__dataclass_fields__[key].default))
             for key, *_rest in PARAMETERS
         }
         self.save_intermediate = tk.BooleanVar(value=False)
-        self.setup_status = tk.StringVar(value="请选择原始谱图、前体目标表与输出位置；使用内置鞘脂库。")
+        self.fragment_unit = tk.StringVar(value="ppm")
+        self._previous_fragment_unit = "ppm"
+        self._fragment_tolerances = {"ppm": str(UntargetedConfig.__dataclass_fields__["fragment_ppm"].default), "Da": "0.3"}
+        self.polarity_var = tk.StringVar(value="正模式")
+        self.setup_status = tk.StringVar(value="请选择 mzML 文件与输出 XLSX；默认 XCMS，无需目标表。")
         self.run_status = tk.StringVar(value="准备就绪 · 选择文件后开始解析，或打开已有结果。")
         self.result_path = tk.StringVar(value="尚未打开结果文件")
         self.result_summary = tk.StringVar(value="尚未加载结果")
@@ -191,6 +207,7 @@ class SphinGOlipIDApp:
         self._build_shell()
         self._build_setup()
         self._build_results()
+        self.fragment_unit.trace_add("write", self._change_fragment_unit)
         self.search_var.trace_add("write", self._schedule_filter)
         self.score_filter_var.trace_add("write", self._schedule_filter)
         self._refresh_selection_labels()
@@ -254,8 +271,8 @@ class SphinGOlipIDApp:
         titles = ttk.Frame(header)
         titles.pack(side=tk.LEFT)
         ttk.Label(titles, text="SphinGOlipID", style="Heading.TLabel").pack(anchor="w")
-        ttk.Label(titles, text=APP_TITLE + " · MS2 匹配与注释", style="Muted.TLabel").pack(anchor="w")
-        ttk.Label(header, text="数据导入  →  参数设置  →  结果查看", style="Muted.TLabel").pack(side=tk.RIGHT)
+        ttk.Label(titles, text="mzML 非靶向峰提取与鞘脂鉴定", style="Muted.TLabel").pack(anchor="w")
+        ttk.Label(header, text="mzML 导入  →  XCMS 峰提取  →  鞘脂鉴定", style="Muted.TLabel").pack(side=tk.RIGHT)
 
         footer = ttk.Frame(self.root, padding=(24, 9))
         footer.pack(side=tk.BOTTOM, fill=tk.X)
@@ -273,38 +290,52 @@ class SphinGOlipIDApp:
     def _build_setup(self) -> None:
         self.setup_page.columnconfigure(0, weight=1)
         self.setup_page.rowconfigure(4, weight=1)
-        inputs = ttk.LabelFrame(self.setup_page, text=" 1 · 输入文件与输出位置 ",
+        inputs = ttk.LabelFrame(self.setup_page, text=" 1 · mzML 文件与结果输出 ",
                                 style="Card.TLabelframe", padding=(16, 6))
         inputs.grid(row=0, column=0, sticky="ew")
         inputs.columnconfigure(1, weight=1)
         rows = (
-            ("原始 MS/MS 数据 (.txt)", "txt_file", self._choose_txt),
-            ("前体离子目标表 (.xlsx)", "precursor_file", self._choose_precursor),
-            ("结果输出文件夹", "output_dir", self._choose_output_dir),
+            ("mzML 文件（可多选）", "mzml_files", self._choose_mzml),
+            ("输出结果 (.xlsx)", "output_file", self._choose_output_file),
         )
         for row, (label, key, command) in enumerate(rows):
             ttk.Label(inputs, text=label, style="Card.TLabel").grid(row=row, column=0, sticky="w", padx=(0, 18), pady=3)
             ttk.Entry(inputs, textvariable=self.path_vars[key], state="readonly").grid(row=row, column=1, sticky="ew", pady=3)
-            button = ttk.Button(inputs, text="选择文件夹" if key == "output_dir" else "选择文件",
+            button = ttk.Button(inputs, text="保存位置" if key == "output_file" else "选择文件",
                                 command=command, width=10)
             button.grid(row=row, column=2, padx=(12, 0), pady=3)
             self.input_controls.append(button)
 
-        parameters = ttk.LabelFrame(self.setup_page, text=" 2 · MS2 匹配参数 ",
+        parameters = ttk.LabelFrame(self.setup_page, text=" 2 · 鉴定参数与 XCMS 峰提取 ",
                                     style="Card.TLabelframe", padding=(16, 6))
         parameters.grid(row=1, column=0, sticky="ew", pady=(16, 0))
-        for column, (key, label, low, high, step, _numeric_type) in enumerate(PARAMETERS):
+        for position, (key, label, low, high, step, _numeric_type) in enumerate(PARAMETERS):
+            column, label_row = position % 4, (position // 4) * 2
             parameters.columnconfigure(column, weight=1, uniform="parameter")
-            ttk.Label(parameters, text=label, style="Card.TLabel").grid(row=0, column=column, sticky="w", padx=6, pady=(0, 5))
+            if key == "fragment_ppm":
+                heading = ttk.Frame(parameters)
+                heading.grid(row=label_row, column=column, sticky="w", padx=6, pady=(0, 5))
+                ttk.Label(heading, text="碎片容差", style="Card.TLabel").pack(side=tk.LEFT)
+                unit = ttk.Combobox(heading, textvariable=self.fragment_unit, values=("ppm", "Da"), width=5, state="readonly")
+                unit.pack(side=tk.LEFT, padx=(6, 0))
+                self.input_controls.append(unit)
+            else:
+                ttk.Label(parameters, text=label, style="Card.TLabel").grid(row=label_row, column=column, sticky="w", padx=6, pady=(8 if label_row else 0, 5))
             spinner = ttk.Spinbox(parameters, textvariable=self.parameter_vars[key],
                                   from_=low, to=high, increment=step, width=10)
-            spinner.grid(row=1, column=column, sticky="ew", padx=6)
+            spinner.grid(row=label_row + 1, column=column, sticky="ew", padx=6)
             self.input_controls.append(spinner)
-        check = ttk.Checkbutton(parameters, text="保留中间文件", variable=self.save_intermediate)
-        check.grid(row=2, column=0, columnspan=2, sticky="w", padx=6, pady=(6, 0))
+            if key == "fragment_ppm":
+                self.fragment_spinner = spinner
+        check = ttk.Checkbutton(parameters, text="保留 XCMS 峰表", variable=self.save_intermediate)
+        check.grid(row=4, column=0, sticky="w", padx=6, pady=(6, 0))
         self.input_controls.append(check)
+        mode = ttk.Combobox(parameters, textvariable=self.polarity_var, values=("正模式", "负模式"), width=10, state="readonly")
+        mode.grid(row=4, column=1, sticky="w", padx=6, pady=(6, 0))
+        self.input_controls.append(mode)
+        ttk.Label(parameters, text="MS1：XCMS centWave", style="Card.TLabel").grid(row=4, column=2, sticky="w", padx=6, pady=(6, 0))
         reset = ttk.Button(parameters, text="恢复默认参数", command=self._reset_parameters)
-        reset.grid(row=2, column=3, columnspan=2, sticky="e", padx=6, pady=(6, 0))
+        reset.grid(row=4, column=3, sticky="e", padx=6, pady=(6, 0))
         self.input_controls.append(reset)
 
         actions = ttk.Frame(self.setup_page)
@@ -315,7 +346,7 @@ class SphinGOlipIDApp:
         self.setup_open_button.pack(side=tk.LEFT, padx=12)
         ttk.Label(actions, textvariable=self.setup_status, style="Muted.TLabel").pack(side=tk.LEFT, padx=8)
 
-        ttk.Label(self.setup_page, text="输入说明：TXT 为质谱导出的原始谱图；目标表需包含 target、下限、上限、RT、Abund 列。",
+        ttk.Label(self.setup_page, text="输入：含 MS1/MS2 的质心化 mzML，无需目标表。峰宽单位为秒；结果包含鉴定、峰面积与完整 MS2 证据。",
                   style="Muted.TLabel", wraplength=850).grid(row=3, column=0, sticky="w", pady=(8, 0))
 
     def _build_results(self) -> None:
@@ -396,30 +427,23 @@ class SphinGOlipIDApp:
     def show_results(self) -> None:
         self.notebook.select(self.results_page)
 
-    def _choose_file(self, key: str, title: str, extension: str) -> None:
+    def _choose_mzml(self) -> None:
         if self.running:
             return
-        path = filedialog.askopenfilename(parent=self.root, title=title,
-                                          filetypes=[(extension.upper() + " 文件", "*." + extension)])
-        if path:
-            setattr(self.selection, key, Path(path))
+        paths = filedialog.askopenfilenames(parent=self.root, title="选择 mzML 文件（可多选）",
+                                           filetypes=[("mzML 文件", "*.mzML *.mzml")])
+        if paths:
+            self.selection.mzml_files = tuple(Path(path) for path in paths)
             self._refresh_selection_labels()
 
-    def _choose_txt(self) -> None:
-        self._choose_file("txt_file", "选择原始 MS/MS 数据", "txt")
-
-    def _choose_precursor(self) -> None:
-        self._choose_file("precursor_file", "选择前体离子目标表", "xlsx")
-
-    def _choose_ms1_db(self) -> None:
-        self._choose_file("ms1_db_file", "选择 MS1 理论数据库", "xlsx")
-
-    def _choose_output_dir(self) -> None:
+    def _choose_output_file(self) -> None:
         if self.running:
             return
-        path = filedialog.askdirectory(parent=self.root, title="选择结果输出文件夹")
+        path = filedialog.asksaveasfilename(parent=self.root, title="选择输出 XLSX 文件",
+            filetypes=[("XLSX 结果文件", "*.xlsx")], defaultextension=".xlsx",
+            initialfile="SphinGOlipID_results.xlsx")
         if path:
-            self.selection.output_dir = Path(path)
+            self.selection.output_file = Path(path)
             self._refresh_selection_labels()
 
     def _choose_result_file(self) -> None:
@@ -432,51 +456,68 @@ class SphinGOlipIDApp:
             self.run_status.set("已打开结果文件 · 可搜索、筛选或点击表头排序。")
 
     def _refresh_selection_labels(self) -> None:
-        count = 0
-        for key, variable in self.path_vars.items():
-            path = getattr(self.selection, key)
-            variable.set(str(path) if path else "未选择")
-            count += path is not None and key in {'txt_file','precursor_file','output_dir'}
-        self.setup_status.set(f"已选择 {count}/3 项" if count < 3 else "输入已就绪，使用内置鞘脂库。")
-        self.run_button.configure(state=tk.NORMAL if count == 3 and not self.running else tk.DISABLED)
+        paths = self.selection.mzml_files
+        self.path_vars["mzml_files"].set(str(paths[0]) if len(paths) == 1 else
+            f"{len(paths)} 个文件：" + "；".join(path.name for path in paths) if paths else "未选择")
+        self.path_vars["output_file"].set(str(self.selection.output_file) if self.selection.output_file else "未选择")
+        count = int(bool(paths)) + int(self.selection.output_file is not None)
+        self.setup_status.set(f"已选择 {count}/2 项" if count < 2 else f"已就绪 · {len(paths)} 个 mzML · 无需目标表")
+        self.run_button.configure(state=tk.NORMAL if count == 2 and not self.running else tk.DISABLED)
+
+    def _change_fragment_unit(self, *_args: Any) -> None:
+        unit = self.fragment_unit.get()
+        if unit not in self._fragment_tolerances or unit == self._previous_fragment_unit:
+            return
+        self._fragment_tolerances[self._previous_fragment_unit] = self.parameter_vars["fragment_ppm"].get()
+        self._previous_fragment_unit = unit
+        self.parameter_vars["fragment_ppm"].set(self._fragment_tolerances[unit])
+        self.fragment_spinner.configure(from_=0.0001 if unit == "Da" else 0.1,
+                                        to=10 if unit == "Da" else 1000,
+                                        increment=0.01 if unit == "Da" else 1)
 
     def _reset_parameters(self) -> None:
         if self.running:
             return
+        self.fragment_unit.set("ppm")
         for key, variable in self.parameter_vars.items():
-            variable.set(str(SphinGOlipIDConfig.__dataclass_fields__[key].default))
+            variable.set(str(UntargetedConfig.__dataclass_fields__[key].default))
         self.save_intermediate.set(False)
+        self._fragment_tolerances = {"ppm": str(UntargetedConfig.__dataclass_fields__["fragment_ppm"].default), "Da": "0.3"}
+        self.polarity_var.set("正模式")
 
     def _validate_selection(self) -> str | None:
-        labels = {"txt_file": "原始 MS/MS 数据", "precursor_file": "前体离子目标表",
-                  "output_dir": "结果输出文件夹"}
-        missing = [label for key, label in labels.items() if getattr(self.selection, key) is None]
+        missing = []
+        if not self.selection.mzml_files:
+            missing.append("mzML 文件")
+        if self.selection.output_file is None:
+            missing.append("输出 XLSX 文件")
         if missing:
             return "请先选择：" + "、".join(missing)
-        for key in ("txt_file", "precursor_file"):
-            if not getattr(self.selection, key).is_file():
-                return f"{labels[key]}不存在或不是文件，请重新选择。"
-        if self.selection.output_dir.exists() and not self.selection.output_dir.is_dir():
-            return "结果输出位置须为文件夹。"
+        for path in self.selection.mzml_files:
+            if not path.is_file() or path.suffix.lower() != ".mzml":
+                return f"mzML 文件不存在或格式不正确：{path}"
+        if self.selection.output_file.exists() and not self.selection.output_file.is_file():
+            return "结果输出位置须为 XLSX 文件。"
         return None
 
-    def _build_config(self) -> SphinGOlipIDConfig:
+    def _build_config(self) -> UntargetedConfig:
         error = self._validate_selection()
         if error:
             raise ValueError(error)
         parameters = parse_matching_parameters({key: var.get() for key, var in self.parameter_vars.items()})
-        return SphinGOlipIDConfig(
-            raw_ms2_dir=self.selection.txt_file.parent,
-            precursor_dir=self.selection.precursor_file.parent,
-            ms1_library_path=self.selection.ms1_db_file,
-            output_dir=self.selection.output_dir,
-            file_indices=(1,),
-            text_pattern=self.selection.txt_file.name.replace("{", "{{").replace("}", "}}"),
-            target_pattern=self.selection.precursor_file.name.replace("{", "{{").replace("}", "}}"),
-            result_pattern="result.xlsx",
-            final_result_name="ms2_annotation_results.xlsx",
+        if self.fragment_unit.get() == "Da":
+            parameters["fragment_da"] = parameters["fragment_ppm"]
+            parameters["fragment_ppm"] = None
+        elif self.fragment_unit.get() != "ppm":
+            raise ValueError("碎片容差单位须为 ppm 或 Da。")
+        modes = {"正模式": "+", "负模式": "-"}
+        if self.polarity_var.get() not in modes:
+            raise ValueError("请选择正模式或负模式。")
+        return UntargetedConfig(
+            mzml_files=self.selection.mzml_files,
+            output_file=self.selection.output_file,
+            polarity=modes[self.polarity_var.get()],
             save_intermediate=self.save_intermediate.get(),
-            enable_rt_validation=False, enable_deduplication=False,
             **parameters,
         )
 
@@ -511,7 +552,7 @@ class SphinGOlipIDApp:
         except Exception as exc:
             self.ui_queue.put(("error", f"无法启动后台解析：{exc}"))
 
-    def _run_backend(self, config: SphinGOlipIDConfig) -> None:
+    def _run_backend(self, config: UntargetedConfig) -> None:
         """Use a frozen config snapshot; the worker never reads Tk variables."""
         logger = logging.getLogger(f"sphingolipid_toolkit.gui.{id(self)}")
         logger.setLevel(logging.INFO)
@@ -519,11 +560,8 @@ class SphinGOlipIDApp:
         handler = QueueLogHandler(self.ui_queue)
         logger.addHandler(handler)
         try:
-            results = run_batch(config, logger=logger)
-            final_result = config.output_dir / config.final_result_name
-            if not final_result.exists() and results:
-                final_result = Path(results[0])
-            self.ui_queue.put(("done", final_result))
+            result = run_untargeted(config, logger=logger)
+            self.ui_queue.put(("done", Path(result)))
         except Exception as exc:
             self.ui_queue.put(("error", str(exc)))
         finally:
@@ -533,7 +571,7 @@ class SphinGOlipIDApp:
     def _set_running_ui(self) -> None:
         state = tk.DISABLED if self.running else tk.NORMAL
         for widget in self.input_controls:
-            widget.configure(state=state)
+            widget.configure(state="readonly" if not self.running and isinstance(widget, ttk.Combobox) else state)
         self.setup_open_button.configure(state=state)
         self.results_open_button.configure(state=state)
         self.export_button.configure(state=tk.NORMAL if self.current_result and not self.running else tk.DISABLED)

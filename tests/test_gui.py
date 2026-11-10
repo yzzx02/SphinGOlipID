@@ -2,6 +2,8 @@
 
 import gzip
 import json
+from pathlib import Path
+import shutil
 import threading
 import time
 import tkinter as tk
@@ -10,13 +12,13 @@ import pandas as pd
 import pytest
 
 from sphingolipid_toolkit import gui
-from sphingolipid_toolkit.config import SphinGOlipIDConfig
+from sphingolipid_toolkit.untargeted import UntargetedConfig
 from sphingolipid_toolkit.result_writer import write_identifications
 
 
 def parameter_values(**changes):
     values = {
-        key: str(SphinGOlipIDConfig.__dataclass_fields__[key].default)
+        key: str(UntargetedConfig.__dataclass_fields__[key].default)
         for key, *_rest in gui.PARAMETERS
     }
     return values | changes
@@ -27,19 +29,23 @@ def parameter_values(**changes):
     {"precursor_ppm": "-1"}, {"min_total_score": "101"},
     {"min_total_score": "inf"}, {"top_n": "2.5"},
     {"top_n": "0"}, {"top_n": ""},
+    {"peakwidth_min": "0"}, {"peakwidth_min": "80"},
+    {"peakwidth_max": "nan"}, {"noise": "-1"}, {"snthresh": "0"},
 ])
 def test_parameters_reject_invalid_user_input(changes):
     with pytest.raises(ValueError):
         gui.parse_matching_parameters(parameter_values(**changes))
 
 
-def test_bundled_library_gui_is_ready_with_three_inputs(app,tmp_path):
+def test_untargeted_gui_is_ready_with_mzml_and_output_only(app,tmp_path):
     select_inputs(app,tmp_path)
-    app.selection.ms1_db_file=None
     app._refresh_selection_labels()
     assert app.run_button.instate(['!disabled'])
     config=app._build_config()
-    assert config.backend=='lipidgate' and config.ms1_library_path is None
+    assert config.mzml_files==(tmp_path/'input.mzML',)
+    assert config.output_file==tmp_path/'result.xlsx'
+    assert config.top_n==1 and config.peakwidth_min==5 and config.peakwidth_max==60
+    assert not hasattr(config,'precursor_file')
 
 
 def test_result_filter_uses_literal_names_numeric_scores_and_original_rows():
@@ -123,11 +129,10 @@ def test_sorted_filtered_selection_and_export_preserve_original_workbook(app, tm
 
 
 def select_inputs(app, tmp_path):
-    for key, name in (("txt_file", "input.txt"), ("precursor_file", "targets.xlsx"), ("ms1_db_file", "library.xlsx")):
-        path = tmp_path / name
-        path.touch()
-        setattr(app.selection, key, path)
-    app.selection.output_dir = tmp_path
+    path=tmp_path/'input.mzML'
+    path.touch()
+    app.selection.mzml_files=(path,)
+    app.selection.output_file=tmp_path/'result.xlsx'
     app._refresh_selection_labels()
 
 
@@ -155,14 +160,14 @@ def test_run_freezes_parameters_preserves_navigation_and_recovers_controls(app, 
 
     def backend(config, logger):
         snapshots.append(config)
-        logger.info("Reading MS2 file: input.txt")
+        logger.info("Matching acquired MS2: input.mzML")
         started.set()
         assert release.wait(5)
-        result = config.output_dir / config.final_result_name
+        result = config.output_file
         result_workbook(result)
-        return [result]
+        return result
 
-    monkeypatch.setattr(gui, "run_batch", backend)
+    monkeypatch.setattr(gui, "run_untargeted", backend)
     app._start_run()
     assert started.wait(2)
     try:
@@ -177,7 +182,7 @@ def test_run_freezes_parameters_preserves_navigation_and_recovers_controls(app, 
         assert snapshots[0].fragment_ppm == 12.5
         assert snapshots[0].precursor_ppm == 8
         assert snapshots[0].min_total_score == 55
-        assert snapshots[0].backend == 'lipidgate'
+        assert snapshots[0].peakwidth_min == 5 and snapshots[0].noise == 1000
         assert snapshots[0].save_intermediate
         app.root.update()
     finally:
@@ -189,7 +194,7 @@ def test_run_freezes_parameters_preserves_navigation_and_recovers_controls(app, 
     assert not app.running
     assert "解析完成" in app.run_status.get()
     assert len(app.result_tree.get_children()) == 3
-    assert "Reading MS2" in app.log_text.get("1.0", tk.END)
+    assert "Matching acquired MS2" in app.log_text.get("1.0", tk.END)
     assert app.run_button.instate(["!disabled"])
     assert app.export_button.instate(["!disabled"])
 
@@ -200,26 +205,55 @@ def test_run_failure_restores_controls_and_shows_error(app, tmp_path, monkeypatc
     monkeypatch.setattr(gui.messagebox, "showerror", lambda title, text, **kwargs: errors.append(text))
     app.running = True
     app._set_running_ui()
-    app.ui_queue.put(("error", "invalid target table"))
+    app.ui_queue.put(("error", "XCMS peak detection failed"))
     app.root.after_cancel(app.queue_after)
     app._drain_queue()
     assert not app.running
-    assert errors == ["invalid target table"]
+    assert errors == ["XCMS peak detection failed"]
     assert app.run_button.instate(["!disabled"])
     assert app.empty_title.cget("text") == "解析失败"
 
 
 def test_filename_braces_reach_backend_as_literal_names(app, tmp_path):
     select_inputs(app, tmp_path)
-    txt = tmp_path / "input{sample}.txt"
-    txt.touch()
-    precursor = tmp_path / "targets{sample}.xlsx"
-    precursor.touch()
-    app.selection.txt_file = txt
-    app.selection.precursor_file = precursor
+    mzml = tmp_path / "input{sample}.mzML"
+    mzml.touch()
+    app.selection.mzml_files = (mzml,)
     config = app._build_config()
-    assert config.text_pattern.format(i=1) == txt.name
-    assert config.target_pattern.format(i=1) == precursor.name
+    assert config.mzml_files == (mzml,)
+
+
+def test_gui_accepts_multiple_mzml_files_and_da_negative_mode(app,tmp_path,monkeypatch):
+    first=tmp_path/'first.mzML'
+    second=tmp_path/'second.mzML'
+    first.touch();second.touch()
+    monkeypatch.setattr(gui.filedialog,'askopenfilenames',lambda **kwargs:(str(first),str(second)))
+    app._choose_mzml()
+    app.selection.output_file=tmp_path/'out.xlsx'
+    app.fragment_unit.set('Da')
+    app.parameter_vars['fragment_ppm'].set('0.3')
+    app.polarity_var.set('负模式')
+    config=app._build_config()
+    assert config.mzml_files==(first,second)
+    assert config.fragment_ppm is None and config.fragment_da==.3
+    assert config.polarity=='-'
+
+
+def test_unit_switch_keeps_distinct_ppm_and_da_values(app,tmp_path):
+    select_inputs(app,tmp_path)
+    app.fragment_unit.set('Da')
+    assert float(app.parameter_vars['fragment_ppm'].get())==.3
+    assert float(app.fragment_spinner.cget('increment'))==.01
+    app.parameter_vars['fragment_ppm'].set('.25')
+    app.fragment_unit.set('ppm')
+    assert float(app.parameter_vars['fragment_ppm'].get())==20
+    app.parameter_vars['fragment_ppm'].set('15')
+    app.fragment_unit.set('Da')
+    assert app._build_config().fragment_da==.25
+    app._reset_parameters()
+    assert app.fragment_unit.get()=='ppm' and float(app.parameter_vars['fragment_ppm'].get())==20
+    app.fragment_unit.set('Da')
+    assert float(app.parameter_vars['fragment_ppm'].get())==.3
 
 
 def test_failed_import_retains_previous_result(app, tmp_path, monkeypatch):
@@ -255,22 +289,30 @@ def test_queue_drain_is_bounded_and_remains_scheduled(app):
     assert app.queue_after in app.root.tk.splitlist(app.root.tk.call("after", "info"))
 
 
-def test_real_gui_run_processes_spectrum_after_upstream_merge(app, tmp_path, monkeypatch):
-    from test_bug_regressions import _write_inputs
-    config = _write_inputs(tmp_path)
-    app.selection = gui.FileSelection(tmp_path / "hilic-msms-1.txt", tmp_path / "hilic-msms-1.xlsx",
-                                      config.ms1_library_path, config.output_dir)
+def test_real_gui_xcms_mzml_run_needs_no_target_table(app, tmp_path, xcms_runtime):
+    source=tmp_path/'中文样本'/'实验.mzML'
+    source.parent.mkdir()
+    shutil.copy2(Path(__file__).parent/'fixtures'/'untargeted_two_local_peaks.mzML',source)
+    output=tmp_path/'中文结果'/'非靶向.xlsx'
+    app.selection = gui.FileSelection((source,),output)
     app._refresh_selection_labels()
     app._start_run()
-    deadline = time.monotonic() + 10
+    deadline = time.monotonic() + 60
     while app.running and time.monotonic() < deadline:
         app.root.update()
         time.sleep(.01)
     assert not app.running
-    assert app.current_result == config.output_dir / config.final_result_name
+    assert app.current_result == output
     assert not app.result_df.empty
     assert app.result_df.matched_fragment_count.max() >= 2
     assert app.export_button.instate(["!disabled"])
+    assert set(pd.ExcelFile(output).sheet_names)=={'annotations','features','spectrum_matches','spectrum_audit','parameters','input_files'}
+    assert app.result_df.lipid_name.tolist()==['Cer(d18:1/16:0)']
+    assert len(pd.read_excel(output,sheet_name='spectrum_matches'))==2
+    features=pd.read_excel(output,sheet_name='features')
+    assert features.apex_rt_min.iloc[0]==pytest.approx(40/60)
+    assert features.peak_area.iloc[0]>0 and features.xcms_peak_id.iloc[0]=='CP1'
+    assert pd.read_excel(output,sheet_name='input_files').xcms.iloc[0]==xcms_runtime['version']
 
 
 def test_closing_during_analysis_keeps_export_running(app, monkeypatch):

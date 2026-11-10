@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "application": "SphinGOlipID",
+  "version": "0.6.0",
+  "date": "2026-11-10",
+  "checkpoint": "codex/sphingolipid-untargeted-mzml-20261110",
+  "parent_commit": "651c303084f408c59efb124be87ebef832bafab8",
+  "scientific_checkpoint": "codex/sphingolipid-literature-20261110-r1",
+  "scientific_rules_and_libraries_unchanged": true,
+  "verified_unchanged_protected_files": 104,
+  "input": "one or more centroided mzML files with MS1/MS2; no target table",
+  "output": "XLSX plus complete adjacent evidence when required",
+  "detector": "XCMS centWave; per-file serial detection; no alignment or gap filling",
+  "parameters": {
+    "precursor_ppm": 10.0,
+    "fragment_ppm": 20.0,
+    "min_total_score": 50.0,
+    "top_n": 1,
+    "peakwidth_seconds": [
+      5.0,
+      60.0
+    ],
+    "noise": 1000.0,
+    "snthresh": 3.0,
+    "polarity": "+",
+    "workers": 1
+  },
+  "hash_encoding": "UTF-8 with LF line endings",
+  "application_file_sha256": {
+    "pyproject.toml": "211797d0d8739bc6081bb3fe852b0d69c6bbc98d5e2de415dabc38083a677acb",
+    "src/sphingolipid_toolkit/__init__.py": "625dcaa332a690c5dfcb8df01a823681a140e457bde6112c9e6edbf37c34751d",
+    "src/sphingolipid_toolkit/gui.py": "26ed50f22e9645bd9ebd9dadcea32ff3bded902532ac3beea178c7f809f11262",
+    "src/sphingolipid_toolkit/untargeted.py": "15bf405847a2417904ca845320238a9f82e1994db9adcd92ffcb53840e632888",
+    "src/sphingolipid_toolkit/untargeted_cli.py": "a8eaf13c3f9672b6fdd4b712fa8052e2e93dc9cd744b1861f9fd7a5872ede19f",
+    "src/sphingolipid_toolkit/result_writer.py": "11bbf18bda0b09698627e9f0ebbe57c2e063fa6460db5aa3286e7240a96a9184",
+    "src/sphingolipid_toolkit/r/xcms_centwave.R": "19123924f6e16d4f1d1b9f7f9807b6aa8cb21783920a30829aff64b4b9fb0d14"
+  },
+  "verification": {
+    "pytest_passed": 1074,
+    "real_xcms_version": "4.8.0",
+    "real_R_version": "4.5.2",
+    "independent_wheel_smoke": true,
+    "unicode_and_same_named_files": true,
+    "synthetic_feature_count": 2,
+    "synthetic_passing_spectrum_rows": 4,
+    "fixture_is_experimental_data": false,
+    "tested_client_sizes": [
+      [
+        1180,
+        720
+      ],
+      [
+        1000,
+        640
+      ]
+    ],
+    "layout_overflow_or_callback_errors": false
+  },
+  "wheel": {
+    "filename": "sphingolipid_toolkit-0.6.0-py3-none-any.whl",
+    "bytes": 85054478,
+    "sha256": "10daaae9f5b53d960eae11628032c03632f0a8fb9ad4072476f73f7b523bad73"
+  }
+}
