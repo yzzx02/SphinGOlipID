@@ -110,13 +110,18 @@ def filter_target_abundance_duplicates(
 
     def _filter(group: pd.DataFrame) -> pd.Series:
         counts = group[index_col].value_counts()
-        most_common = counts.index[0]
-        candidates = group[group[index_col] == most_common]
+        most_common = counts[counts == counts.max()].index
+        candidates = group[group[index_col].isin(most_common)]
+        if candidates.empty:
+            candidates = group
         if len(candidates) > 1:
-            return candidates.loc[candidates[total_score_col].idxmax()]
+            scores = pd.to_numeric(candidates[total_score_col], errors="coerce").reset_index(drop=True)
+            best_position = scores.sort_values(ascending=False, kind="stable", na_position="last").index[0]
+            return candidates.iloc[best_position]
         return candidates.iloc[0]
 
-    return data.groupby(list(group_cols), group_keys=False).apply(_filter).reset_index(drop=True)
+    rows = [_filter(group) for _, group in data.groupby(list(group_cols), sort=False, dropna=False)]
+    return pd.DataFrame(rows).reset_index(drop=True) if rows else data.iloc[:0].copy()
 
 
 def remove_duplicate_annotations(

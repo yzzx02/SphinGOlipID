@@ -13,10 +13,14 @@ from typing import List, Sequence, Tuple
 import pandas as pd
 
 from . import ms2_legacy_core as core
-from .config import LEGACY_FRAGMENT_PPM, SphinGOlipIDConfig
+from .config import LEGACY_FRAGMENT_PPM, SphinGOlipIDConfig, normalize_file_indices, validate_batch_settings
 from .io_utils import (
     read_ms2_spectra_text,
     validate_ms2_file_inputs,
+    validate_output_paths,
+    require_file,
+    resolve_ms2_input_paths,
+    write_excel_atomic,
 )
 from .logging_utils import get_logger
 from .logging_utils import attach_file_handler
@@ -56,7 +60,8 @@ class MS2PipelineConfig:
         self.ms1_db_path = Path(self.ms1_db_path)
         if self.precursor_dir is not None:
             self.precursor_dir = Path(self.precursor_dir)
-        self.file_indices = tuple(int(i) for i in self.file_indices)
+        self.file_indices = normalize_file_indices(self.file_indices)
+        validate_batch_settings(self)
 
     @property
     def raw_ms2_dir(self) -> Path:
@@ -119,7 +124,7 @@ def _write_empty_result(result_xlsx: Path) -> pd.DataFrame:
     ]
     result = pd.DataFrame(columns=columns)
     result = add_standard_score_columns(result)
-    result.to_excel(result_xlsx, index=False)
+    write_excel_atomic(result, result_xlsx, index=False)
     return result
 
 
@@ -153,14 +158,17 @@ def _write_db_sheets(out_db_csv: Path, db_data_xlsx: Path, parameter: float) -> 
         labels = group.groupby("mz")["idf"].agg(lambda xs: " | ".join(sorted(set(xs.astype(str)))))
         group["idf"] = group["mz"].map(labels)
         return group.drop_duplicates(subset="mz")
-    resultp = dfs.groupby("anno", group_keys=False).apply(merge_labels)
+    resultp = pd.concat(
+        [merge_labels(group) for _, group in dfs.groupby(["target", "RT", "Abund", "anno"], sort=False)],
+        ignore_index=True,
+    ) if not dfs.empty else dfs
     if resultp.empty:
         return False
     grouped_s = resultp.groupby("target")
 
     with pd.ExcelWriter(db_data_xlsx, engine="openpyxl") as writer:
         for target, group in grouped_s:
-            group.to_excel(writer, sheet_name=str(target), index=False)
+            group.to_excel(writer, sheet_name=str(float(target)), index=False)
     return True
 
 
@@ -182,13 +190,12 @@ def _finalize_results(out_query_csv: Path, result_xlsx: Path, min_matched_fragme
 
     # For duplicated theoretical fragments in one annotation, keep the measured
     # fragment with the highest intensity. This follows the notebook logic.
-    cleaned_data = (
-        df_max.groupby("anno", group_keys=False)
-        .apply(lambda x: x.sort_values("intense", ascending=False).drop_duplicates("mz", keep="first"))
-        .reset_index(drop=True)
+    candidate_keys = ["target", "RT", "Abund", "anno"]
+    cleaned_data = df_max.sort_values("intense", ascending=False).drop_duplicates(candidate_keys + ["mz"])
+    middle_df = pd.concat(
+        [core.process_group(group) for _, group in cleaned_data.groupby(candidate_keys, sort=False)],
+        ignore_index=True,
     )
-
-    middle_df = cleaned_data.groupby("anno").apply(core.process_group).reset_index(drop=True)
     if middle_df.empty:
         return _write_empty_result(result_xlsx)
     middle_df = middle_df[middle_df["实际mz"].apply(lambda x: len(x) >= min_matched_fragments)]
@@ -198,7 +205,7 @@ def _finalize_results(out_query_csv: Path, result_xlsx: Path, min_matched_fragme
     middle_df["强度总和"] = middle_df["强度"].apply(lambda x: sum(x))
 
     result = pd.DataFrame()
-    for _, group in middle_df.groupby("target"):
+    for _, group in middle_df.groupby(["target", "RT", "Abund"], sort=False):
         group = group.sort_values(by="强度总和", ascending=False)
         rank = group["强度总和"].rank(method="dense", ascending=False)
         group["总分数"] = (100 - (rank - 1) * 10) * group["匹配度分数"]
@@ -212,10 +219,11 @@ def _finalize_results(out_query_csv: Path, result_xlsx: Path, min_matched_fragme
 
     result.reset_index(drop=True, inplace=True)
     result = add_standard_score_columns(result)
-    result.to_excel(result_xlsx, index=False)
+    write_excel_atomic(result, result_xlsx, index=False)
     return result
 
 
+@core.synchronized_legacy_runtime
 def run_one_file(config: ConfigLike, file_index: int, logger: logging.Logger | None = None) -> Path:
     """Run the MS/MS matching workflow for one HILIC-MS/MS export file."""
 
@@ -246,7 +254,7 @@ def run_one_file(config: ConfigLike, file_index: int, logger: logging.Logger | N
         logger.error("%s", exc)
         raise
 
-    for p in [isomer_file, out_db_csv, out_query_csv, ms2_data, db_data, parent_ion_file, result_file]:
+    for p in [isomer_file, out_db_csv, out_query_csv, ms2_data, db_data, parent_ion_file]:
         _ensure_clean_file(p)
 
     # Set legacy-module runtime globals. This keeps the original function bodies
@@ -294,21 +302,15 @@ def run_one_file(config: ConfigLike, file_index: int, logger: logging.Logger | N
                     p.unlink()
         return result_file
 
-    df_rel = pd.ExcelFile(ms2_data)
-    attr_df = pd.ExcelFile(db_data, engine="openpyxl")
-    try:
+    with pd.ExcelFile(ms2_data) as df_rel, pd.ExcelFile(db_data, engine="openpyxl") as attr_df:
         start_time = time()
         logger.info("Matching precursor fragment sheets for file index %s", file_index)
         for sheet_name in attr_df.sheet_names:
-            try:
-                core.process_sheet(sheet_name, df_rel, attr_df)
-            except Exception as exc:  # keep batch mode tolerant as in notebook
-                logger.warning("Error while processing sheet %s: %s", sheet_name, exc)
+            if sheet_name not in df_rel.sheet_names:
+                logger.warning("No measured spectrum for precursor %s", sheet_name)
                 continue
+            core.process_sheet(sheet_name, df_rel, attr_df)
         logger.info("MS2 matching for file %s finished in %.2f s", file_index, time() - start_time)
-    finally:
-        df_rel.close()
-        attr_df.close()
 
     logger.info("Exporting results: %s", result_file)
     _finalize_results(
@@ -328,10 +330,18 @@ def run_one_file(config: ConfigLike, file_index: int, logger: logging.Logger | N
     return result_file
 
 
+@core.synchronized_legacy_runtime
 def run_batch(config: ConfigLike, logger: logging.Logger | None = None) -> List[Path]:
     """Run matching for every index in ``config.file_indices``."""
 
     config = _coerce_config(config)
+    validate_batch_settings(config)
+    validate_output_paths(config, config.file_indices)
+    require_file(config.ms1_db_path, "MS1 theoretical library")
+    for i in config.file_indices:
+        paths = resolve_ms2_input_paths(config, i)
+        require_file(paths.text_file, f"MS/MS txt file for index {i}")
+        require_file(paths.target_file, f"precursor target Excel for index {i}")
     logger = logger or get_logger("sphingolipid_toolkit.ms2")
     output_dir = Path(config.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -345,7 +355,8 @@ def run_batch(config: ConfigLike, logger: logging.Logger | None = None) -> List[
         _write_batch_result(results, output_dir / config.final_result_name, logger)
         logger.info("MS2 batch completed")
     finally:
-        file_handler.flush()
+        logger.removeHandler(file_handler)
+        file_handler.close()
     return results
 
 
@@ -362,7 +373,7 @@ def _write_batch_result(result_files: Sequence[Path], final_result_file: Path, l
     result = pd.concat(frames, ignore_index=True) if frames else add_standard_score_columns(pd.DataFrame())
     result = add_standard_score_columns(result)
     logger.info("Exporting results: %s", final_result_file)
-    result.to_excel(final_result_file, index=False)
+    write_excel_atomic(result, final_result_file, index=False)
     return result
 
 
@@ -375,4 +386,7 @@ def parse_file_indices(value: str) -> Tuple[int, ...]:
         if b < a:
             raise ValueError("file index range end must be >= start")
         return tuple(range(a, b + 1))
-    return tuple(int(x.strip()) for x in value.split(",") if x.strip())
+    indices = tuple(int(x.strip()) for x in value.split(",") if x.strip())
+    if not indices or any(i < 0 for i in indices):
+        raise ValueError("file indices must contain at least one non-negative integer")
+    return tuple(dict.fromkeys(indices))

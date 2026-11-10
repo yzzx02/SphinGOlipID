@@ -16,10 +16,13 @@ import pandas as pd
 from pyteomics import mzml
 
 from . import ms2_legacy_core as core
-from .config import TARGETED_FRAGMENT_PPM
+from .config import TARGETED_FRAGMENT_PPM, validate_matching_parameters
 from .fragment_assignment import select_one_to_one_edges
 from .glycan_encoding import parse_glycan_encoding
-from .io_utils import ensure_output_dir, read_ms1_library
+from .io_utils import (
+    InputValidationError, MS1_LIBRARY_REQUIRED_COLUMNS, coerce_numeric_columns,
+    ensure_output_dir, read_ms1_library, require_file, write_excel_atomic,
+)
 from .logging_utils import attach_file_handler, configure_logging, get_logger
 from .rt_validation import add_series_columns, fit_ransac_models, predict_rt
 from .scoring import add_standard_score_columns
@@ -54,6 +57,14 @@ class TargetedMzMLConfig:
     raw_targetlist_name: str = "combined_targetlist_raw.xlsx"
 
     def __post_init__(self) -> None:
+        validate_matching_parameters(self)
+        for name in ("ms1_candidate_ppm", "feature_mz_ppm", "feature_rt_tolerance_min", "feature_merge_ppm",
+                     "feature_merge_mz_tolerance_da", "feature_merge_rt_tolerance_min", "rt_fit_residual_threshold"):
+            value = getattr(self, name)
+            if not np.isfinite(value) or value < 0 or (name == "rt_fit_residual_threshold" and value == 0):
+                raise ValueError(f"Invalid {name}: {value}")
+        if not isinstance(self.rt_fit_min_points, int) or isinstance(self.rt_fit_min_points, bool) or self.rt_fit_min_points < 2:
+            raise ValueError("rt_fit_min_points must be an integer of at least 2")
         object.__setattr__(self, "data_dir", Path(self.data_dir))
         object.__setattr__(self, "ms1_library_path", Path(self.ms1_library_path))
         object.__setattr__(self, "output_dir", Path(self.output_dir))
@@ -92,6 +103,39 @@ class MS2Spectrum:
     fragment_mz: np.ndarray
     fragment_intensity: np.ndarray
 
+    def __post_init__(self) -> None:
+        masses = np.asarray(self.fragment_mz, dtype=float)
+        intensities = np.asarray(self.fragment_intensity, dtype=float)
+        if masses.ndim != 1 or intensities.ndim != 1 or len(masses) != len(intensities):
+            raise InputValidationError(f"MS2 scan {self.scan_id}: fragment arrays must be one-dimensional with equal lengths")
+        if not np.isfinite(self.precursor_mz) or self.precursor_mz <= 0 or not np.isfinite(self.ms2_rt):
+            raise InputValidationError(f"MS2 scan {self.scan_id}: precursor m/z and RT must be finite, and precursor m/z positive")
+        object.__setattr__(self, "mzml_file", Path(self.mzml_file))
+        object.__setattr__(self, "fragment_mz", masses)
+        object.__setattr__(self, "fragment_intensity", intensities)
+
+
+def _find_input_files(directory: str | Path, suffix: str) -> list[Path]:
+    root = Path(directory)
+    if not root.is_dir():
+        raise FileNotFoundError(f"Input directory does not exist: {root}")
+    return sorted(path for path in root.rglob("*") if path.is_file() and path.suffix.lower() == suffix.lower())
+
+
+def _validate_targeted_paths(config: TargetedMzMLConfig) -> None:
+    library = require_file(config.ms1_library_path, "MS1 theoretical library")
+    targetlists = _find_input_files(config.targetlist_dir, ".csv")
+    spectra = _find_input_files(config.mzml_dir, ".mzml")
+    if not targetlists or not spectra:
+        raise InputValidationError("Targeted workflow requires targetlist CSV files and mzML files")
+    inputs = {path.resolve() for path in [library, *targetlists, *spectra]}
+    outputs = [(config.output_dir / getattr(config, name)).resolve() for name in
+               ("log_file_name", "raw_result_name", "fitted_result_name", "feature_table_name", "raw_targetlist_name")]
+    if any(path in inputs for path in outputs):
+        raise InputValidationError("An output file would overwrite a targeted input file; choose another output folder or result name")
+    if len(set(outputs)) != len(outputs):
+        raise InputValidationError("Targeted result and log files must have distinct output paths")
+
 
 def run_targeted_mzml_batch(
     config: TargetedMzMLConfig,
@@ -99,32 +143,43 @@ def run_targeted_mzml_batch(
 ) -> dict[str, Path]:
     """Run the complete targeted mzML annotation workflow."""
 
+    _validate_targeted_paths(config)
     logger = logger or get_logger("sphingolipid_toolkit.targeted_mzml")
     output_dir = ensure_output_dir(config.output_dir)
-    attach_file_handler(output_dir / config.log_file_name, logger=logger)
-    logger.info("Effective fragment_ppm=%s (targeted mzML workflow config)", config.fragment_ppm)
+    handler = attach_file_handler(output_dir / config.log_file_name, logger=logger)
+    try:
+        logger.info("Effective fragment_ppm=%s (targeted mzML workflow config)", config.fragment_ppm)
+        return _run_targeted_mzml_batch(config, logger)
+    finally:
+        logger.removeHandler(handler)
+        handler.close()
+
+
+def _run_targeted_mzml_batch(config: TargetedMzMLConfig, logger: logging.Logger) -> dict[str, Path]:
+    output_dir = config.output_dir
 
     logger.info("Building combined MS1 feature table from targetlists")
     targetlist_raw = read_targetlist_directory(config.targetlist_dir)
+    if targetlist_raw.empty:
+        raise InputValidationError("No enabled, usable MS1 targets were found in the targetlist CSV files")
     features = build_ms1_feature_table(
         targetlist_raw,
         mz_tolerance_da=config.feature_merge_mz_tolerance_da,
         mz_tolerance_ppm=config.feature_merge_ppm,
         rt_tolerance_min=config.feature_merge_rt_tolerance_min,
     )
-    targetlist_raw.to_excel(output_dir / config.raw_targetlist_name, index=False)
-    features.to_excel(output_dir / config.feature_table_name, index=False)
-
     logger.info("Loading MS1 theoretical library")
     library = _read_legacy_or_normalized_ms1_library(config.ms1_library_path)
+    write_excel_atomic(targetlist_raw, output_dir / config.raw_targetlist_name, index=False)
+    write_excel_atomic(features, output_dir / config.feature_table_name, index=False)
 
     logger.info("Matching targeted mzML files")
     raw_results = annotate_mzml_directory(features, library, config, logger=logger)
-    raw_results.to_excel(output_dir / config.raw_result_name, index=False)
+    write_excel_atomic(raw_results, output_dir / config.raw_result_name, index=False)
 
     logger.info("Running RT fitting filter with top 1-%s candidates", config.top_n)
     fitted_results = apply_rt_fit_filter(raw_results, config)
-    fitted_results.to_excel(output_dir / config.fitted_result_name, index=False)
+    write_excel_atomic(fitted_results, output_dir / config.fitted_result_name, index=False)
 
     logger.info("Targeted mzML workflow completed")
     return {
@@ -141,7 +196,7 @@ def read_targetlist_directory(targetlist_dir: str | Path) -> pd.DataFrame:
 
     root = Path(targetlist_dir)
     rows: list[pd.DataFrame] = []
-    for csv_file in sorted(root.rglob("*.csv")):
+    for csv_file in _find_input_files(root, ".csv"):
         frame = read_targetlist_csv(csv_file)
         if frame.empty:
             continue
@@ -168,15 +223,24 @@ def read_targetlist_csv(path: str | Path) -> pd.DataFrame:
     """Read one Agilent TargetedMSMSTable CSV and normalize columns."""
 
     csv_path = Path(path)
-    first_line = csv_path.read_text(encoding="utf-8", errors="ignore").splitlines()[0]
-    skiprows = 1 if first_line.startswith("TargetedMSMSTable") else 0
-    data = pd.read_csv(csv_path, skiprows=skiprows)
+    first_line = ""
+    leading_rows = 0
+    with csv_path.open(encoding="utf-8-sig") as handle:
+        for leading_rows, line in enumerate(handle):
+            if line.strip():
+                first_line = line
+                break
+    if not first_line:
+        raise InputValidationError(f"Empty targetlist CSV file: {csv_path}")
+    skiprows = leading_rows + int(first_line.strip().startswith("TargetedMSMSTable"))
+    data = pd.read_csv(csv_path, skiprows=skiprows, encoding="utf-8-sig")
+    data.columns = data.columns.str.strip()
     required = {"Prec. m/z", "Ret. Time (min)"}
     missing = required - set(data.columns)
     if missing:
         raise ValueError(f"{csv_path}: missing targetlist column(s): {sorted(missing)}")
     if "On" in data.columns:
-        data = data[data["On"].astype(str).str.lower().isin({"true", "1", "yes"})].copy()
+        data = data[data["On"].astype(str).str.strip().str.lower().isin({"true", "1", "1.0", "yes"})].copy()
     out = pd.DataFrame(
         {
             "target_mz": pd.to_numeric(data["Prec. m/z"], errors="coerce"),
@@ -247,7 +311,7 @@ def annotate_mzml_directory(
     """Annotate every MS2 spectrum in all mzML files and return long-form rows."""
 
     logger = logger or get_logger("sphingolipid_toolkit.targeted_mzml")
-    mzml_files = sorted(Path(config.mzml_dir).rglob("*.mzML"))
+    mzml_files = _find_input_files(config.mzml_dir, ".mzml")
     rows: list[pd.DataFrame] = []
     with TemporaryDirectory(prefix="sphingolipid_targeted_") as temp_dir:
         fragment_cache: dict[str, pd.DataFrame] = {}
@@ -385,8 +449,9 @@ def annotate_one_spectrum(
 
     result = add_standard_score_columns(result)
     lipid_col = "lipid_name" if "lipid_name" in result.columns else "注释"
-    candidate_errors = candidates.set_index("name")["ms1_library_mz_error_ppm"].to_dict()
-    result["ms1_library_mz_error_ppm"] = result[lipid_col].map(candidate_errors)
+    candidate_errors = candidates.groupby("name")["ms1_library_mz_error_ppm"].min()
+    errors = result["母离子"].map(candidate_errors) if "母离子" in result else result[lipid_col].map(candidate_errors)
+    result["ms1_library_mz_error_ppm"] = errors.fillna(result[lipid_col].map(candidate_errors))
     for col, value in feature.items():
         result[col] = value
     result["ms2_rt"] = spectrum.ms2_rt
@@ -421,6 +486,7 @@ def search_ms1_candidates(
     return candidates
 
 
+@core.synchronized_legacy_runtime
 def generate_legacy_fragments_for_candidates(
     candidates: pd.DataFrame,
     observed_mz: float,
@@ -607,7 +673,7 @@ def apply_rt_fit_filter(results: pd.DataFrame, config: TargetedMzMLConfig) -> pd
     predicted = predict_rt(data, models, series_col="series", x_col="x")
     data["predicted_rt"] = predicted["pred_y"]
     data["rt_error"] = data["ms1_rt"] - data["predicted_rt"]
-    modeled_ids = set(modelable["identification_id"])
+    modeled_ids = set(modelable.loc[modelable["series"].isin(models["series"]), "identification_id"])
     inlier_ids = set(inliers["identification_id"]) if "identification_id" in inliers.columns else set()
     data.loc[data["identification_id"].isin(modeled_ids), "rt_validation_status"] = "outlier"
     data.loc[data["identification_id"].isin(inlier_ids), "rt_validation_status"] = "pass"
@@ -619,7 +685,10 @@ def _extract_scan_rt(spectrum: dict) -> float | None:
     if not scans:
         return None
     value = scans[0].get("scan start time")
-    return float(value) if value is not None else None
+    if value is None:
+        return None
+    unit = str(getattr(value, "unit_info", "minute")).lower()
+    return float(value) / 60 if unit in {"second", "seconds", "s", "uo:0000010"} else float(value)
 
 
 def _extract_precursor(spectrum: dict) -> dict[str, float | None] | None:
@@ -643,23 +712,22 @@ def _extract_precursor(spectrum: dict) -> dict[str, float | None] | None:
 
 
 def _read_legacy_or_normalized_ms1_library(path: str | Path) -> pd.DataFrame:
-    path = Path(path)
-    try:
-        return read_ms1_library(path)
-    except Exception:
-        pass
+    path = require_file(path, "MS1 theoretical library")
 
     if path.suffix.lower() == ".csv":
         return _read_masshunter_compound_csv(path)
 
-    xls = pd.ExcelFile(path)
-    frames = [pd.read_excel(path, sheet_name=sheet) for sheet in xls.sheet_names]
+    with pd.ExcelFile(path) as xls:
+        frames = [xls.parse(sheet) for sheet in xls.sheet_names]
+    if set(MS1_LIBRARY_REQUIRED_COLUMNS).issubset(frames[0].columns):
+        return read_ms1_library(path)
     data = pd.concat(frames, ignore_index=True)
     mz_col = _first_existing(data, ["理论值", "calculated_m/z", "理论 m/z", "theoretical_mz"])
     name_col = _first_existing(data, ["name", "lipid_name", "Name"])
     class_col = _first_existing(data, ["classy", "main_class", "lipid_class"])
     if mz_col is None or name_col is None:
         raise ValueError(f"MS1 library cannot be normalized; missing m/z or lipid name columns: {path}")
+    data = coerce_numeric_columns(data, (mz_col,), "MS1 theoretical library")
     normalized = pd.DataFrame(
         {
             "理论值": pd.to_numeric(data[mz_col], errors="coerce"),

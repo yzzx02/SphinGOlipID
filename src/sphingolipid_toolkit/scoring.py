@@ -116,11 +116,14 @@ def score_fragment_matches(matches: pd.DataFrame, total_fragment_intensity: floa
         matched_intensity_sum = 0.0
         count = 0
     else:
-        count = int(matches.get("matched", True).sum()) if "matched" in matches else int(len(matches))
-        intensity = pd.to_numeric(matches.get("observed_intensity", pd.Series(dtype=float)), errors="coerce").fillna(0)
+        matched_rows = matches.loc[matches["matched"].eq(True).fillna(False)] if "matched" in matches else matches
+        count = len(matched_rows)
+        intensity = pd.to_numeric(matched_rows.get("observed_intensity", pd.Series(dtype=float)), errors="coerce").fillna(0)
         matched_intensity_sum = float(intensity.sum())
 
     total = float(total_fragment_intensity) if total_fragment_intensity is not None else matched_intensity_sum
+    if not math.isfinite(total) or total < 0:
+        raise ValueError("Total fragment intensity must be finite and nonnegative")
     ratio = matched_intensity_sum / total if total else 0.0
     return {
         "matched_fragment_count": count,
@@ -157,7 +160,8 @@ def add_standard_score_columns(result: pd.DataFrame) -> pd.DataFrame:
     if "ms2_match_score" not in out.columns and "匹配度分数" in out.columns:
         out["ms2_match_score"] = out["匹配度分数"]
     if "rank" not in out.columns and {"target", "总分数"}.issubset(out.columns):
-        out["rank"] = out.groupby("target")["总分数"].rank(method="dense", ascending=False).astype(int)
+        keys = [col for col in ("source_result_file", "target", "RT", "Abund") if col in out.columns]
+        out["rank"] = out.groupby(keys, dropna=False)["总分数"].rank(method="dense", ascending=False).astype("Int64")
     return out
 
 

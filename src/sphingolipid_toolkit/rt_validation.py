@@ -174,6 +174,8 @@ def fit_ransac_models(
 
         x = group[x_col].astype(float).to_numpy().reshape(-1, 1)
         y = group[y_col].astype(float).to_numpy()
+        if not np.isfinite(x).all() or not np.isfinite(y).all() or len(np.unique(x)) < 2:
+            continue
         model = RANSACRegressor(
             min_samples=2,
             residual_threshold=residual_threshold,
@@ -214,8 +216,10 @@ def fit_ransac_models(
             )
         )
 
-    inlier_table = pd.concat(inlier_frames, ignore_index=True) if inlier_frames else pd.DataFrame()
-    model_table = pd.DataFrame([summary.__dict__ for summary in summaries])
+    inlier_table = pd.concat(inlier_frames, ignore_index=True) if inlier_frames else data.iloc[:0].assign(
+        pred_y=pd.Series(dtype=float), rt_deviation=pd.Series(dtype=float), rt_abs_deviation=pd.Series(dtype=float)
+    )
+    model_table = pd.DataFrame([summary.__dict__ for summary in summaries], columns=list(RTModelSummary.__dataclass_fields__))
     return inlier_table, model_table
 
 
@@ -223,6 +227,9 @@ def predict_rt(data: pd.DataFrame, model_table: pd.DataFrame, series_col: str = 
     """Add predicted RT values to ``data`` using a model table from RANSAC."""
 
     out = data.copy()
+    if model_table.empty or out.empty:
+        out["pred_y"] = pd.Series(float("nan"), index=out.index, dtype=float)
+        return out
     models = model_table.set_index("series")[["slope", "intercept"]].to_dict("index")
 
     def _predict(row: pd.Series) -> float:
@@ -265,27 +272,47 @@ def match_predicted_to_targets(
     """Match predicted RT/mass candidates to a target table.
 
     This is a vector-safe version of the notebook's binary-search matching cell.
+    Overlapping target fields receive a ``_target`` suffix; missing RT is never
+    treated as a valid retention-time match.
     """
 
     if predicted.empty or targets.empty:
         return pd.DataFrame()
+    if not predicted.columns.is_unique or not targets.columns.is_unique:
+        raise ValueError("Prediction and target tables must have unique column names")
+    if not np.isfinite(rt_tolerance) or rt_tolerance < 0 or not np.isfinite(mz_tolerance) or mz_tolerance < 0:
+        raise ValueError("RT and m/z tolerances must be finite and nonnegative")
+
+    used_columns = set(predicted.columns)
+    target_columns = {}
+    for column in targets.columns:
+        name = column
+        while name in used_columns:
+            name = f"{name}_target"
+        target_columns[column] = name
+        used_columns.add(name)
 
     rt_values = targets[rt_col_target].to_numpy(dtype=float)
-    sorted_idx = np.argsort(rt_values)
+    finite_indices = np.flatnonzero(np.isfinite(rt_values))
+    sorted_idx = finite_indices[np.argsort(rt_values[finite_indices])]
     sorted_rt = rt_values[sorted_idx]
     target_mz = targets[mz_col_target].to_numpy(dtype=float)
-    rows: list[pd.Series] = []
+    rows: list[dict[str, object]] = []
 
     for _, pred_row in predicted.iterrows():
         pred_rt = float(pred_row[rt_col_pred])
+        if not np.isfinite(pred_rt):
+            continue
         lower = np.searchsorted(sorted_rt, pred_rt - rt_tolerance)
         upper = np.searchsorted(sorted_rt, pred_rt + rt_tolerance, side="right")
         candidate_masses = [float(pred_row[col]) for col in mz_cols_pred if col in pred_row and pd.notna(pred_row[col])]
         for target_pos in sorted_idx[lower:upper]:
             if not candidate_masses:
                 continue
-            if np.any(np.isclose(candidate_masses, target_mz[target_pos], atol=mz_tolerance)):
-                rows.append(pd.concat([pred_row, targets.iloc[target_pos]], axis=0))
+            if np.any(np.isclose(candidate_masses, target_mz[target_pos], atol=mz_tolerance, rtol=0)):
+                row = pred_row.to_dict()
+                row.update({target_columns[col]: value for col, value in targets.iloc[target_pos].items()})
+                rows.append(row)
 
     return pd.DataFrame(rows)
 

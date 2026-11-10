@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from math import isfinite
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Iterable, Sequence
 
 import pandas as pd
@@ -44,15 +46,27 @@ def ensure_output_dir(path: str | Path) -> Path:
 
     output_dir = Path(path)
     output_dir.mkdir(parents=True, exist_ok=True)
-    probe = output_dir / ".sphingolipid_write_test"
     try:
-        probe.write_text("ok", encoding="utf-8")
+        with NamedTemporaryFile(dir=output_dir, prefix=".sphingolipid_write_test_", mode="w") as probe:
+            probe.write("ok")
     except OSError as exc:
         raise OSError(f"Output directory is not writable: {output_dir}") from exc
-    finally:
-        if probe.exists():
-            probe.unlink()
     return output_dir
+
+
+def write_excel_atomic(data: pd.DataFrame, path: str | Path, **kwargs) -> Path:
+    """Replace an Excel result only after a complete workbook has been written."""
+
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile(dir=destination.parent, prefix=".sphingolipid_result_", suffix=destination.suffix, delete=False) as handle:
+        temporary = Path(handle.name)
+    try:
+        data.to_excel(temporary, **kwargs)
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return destination
 
 
 def require_columns(data: pd.DataFrame, required_columns: Iterable[str], context: str) -> None:
@@ -73,7 +87,9 @@ def coerce_numeric_columns(data: pd.DataFrame, columns: Iterable[str], context: 
             raise InputValidationError(f"{context}: Missing required column: {col}")
         original = out[col]
         converted = pd.to_numeric(original, errors="coerce")
-        invalid = converted.isna() & original.notna() & (original.astype(str).str.strip() != "")
+        invalid = (
+            converted.isna() & original.notna() & (original.astype(str).str.strip() != "")
+        ) | converted.isin([float("inf"), -float("inf")])
         if invalid.any():
             bad_value = original[invalid].iloc[0]
             raise InputValidationError(f"{context}: Column {col} contains non-numeric value: {bad_value!r}")
@@ -121,23 +137,33 @@ def get_ms1_library_path(config: object) -> Path:
     return Path(_get_required_attr(config, "ms1_library_path", "ms1_db_path"))
 
 
+def validate_output_paths(config: object, file_indices: Sequence[int]) -> None:
+    """Check every batch output before cleanup can overwrite another input."""
+
+    paths = [resolve_ms2_input_paths(config, i) for i in file_indices]
+    protected = {get_ms1_library_path(config).resolve()}
+    protected.update(path.resolve() for item in paths for path in (item.text_file, item.target_file))
+    output_dir = Path(config.output_dir)
+    intermediate = output_dir / config.intermediate_dir_name
+    outputs = [item.result_file for item in paths]
+    outputs.extend(output_dir / name for name in (config.final_result_name, config.log_file_name))
+    outputs.extend(intermediate / name for name in ("Isomer.xlsx", "out_DB.csv", "out-query.csv", "目标母离子.xlsx"))
+    outputs.extend(intermediate / f"{prefix}-{i}.xlsx" for i in file_indices for prefix in ("actual_ms2_data", "DB_sheet"))
+    if any(path.resolve() in protected for path in outputs):
+        raise InputValidationError("An output file would overwrite a selected input file; choose another output folder or result name")
+    resolved_outputs = [path.resolve() for path in outputs]
+    if len(set(resolved_outputs)) != len(resolved_outputs):
+        raise InputValidationError("Result, log and intermediate files must have distinct output paths")
+
+
 def validate_ms2_file_inputs(config: object, file_index: int) -> tuple[MS2InputPaths, pd.DataFrame]:
     """Validate all inputs needed for one MS2 file and return target rows."""
 
     paths = resolve_ms2_input_paths(config, file_index)
     require_file(paths.text_file, f"MS/MS txt file for index {file_index}")
-    target_df = read_excel_table(
-        paths.target_file,
-        required_columns=TARGET_REQUIRED_COLUMNS,
-        numeric_columns=TARGET_NUMERIC_COLUMNS,
-        context=f"precursor target Excel for index {file_index}",
-    )
-    read_excel_table(
-        get_ms1_library_path(config),
-        required_columns=MS1_LIBRARY_REQUIRED_COLUMNS,
-        numeric_columns=MS1_LIBRARY_NUMERIC_COLUMNS,
-        context="MS1 theoretical library",
-    )
+    target_df = read_precursor_table(paths.target_file)
+    read_ms1_library(get_ms1_library_path(config))
+    validate_output_paths(config, (file_index,))
     ensure_output_dir(getattr(config, "output_dir"))
     return paths, target_df
 
@@ -145,7 +171,7 @@ def validate_ms2_file_inputs(config: object, file_index: int) -> tuple[MS2InputP
 def validate_input_paths(config: object, file_indices: Sequence[int] | None = None) -> list[MS2InputPaths]:
     """Validate configured MS2 inputs for all requested file indices."""
 
-    indices = tuple(file_indices or getattr(config, "file_indices"))
+    indices = tuple(getattr(config, "file_indices") if file_indices is None else file_indices)
     validated: list[MS2InputPaths] = []
     for file_index in indices:
         paths, _ = validate_ms2_file_inputs(config, int(file_index))
@@ -162,13 +188,18 @@ def validate_required_columns(data: pd.DataFrame, required_columns: Iterable[str
 def read_precursor_table(path: str | Path, **kwargs) -> pd.DataFrame:
     """Read and validate a precursor target Excel table."""
 
-    return read_excel_table(
+    data = read_excel_table(
         path,
         required_columns=TARGET_REQUIRED_COLUMNS,
         numeric_columns=TARGET_NUMERIC_COLUMNS,
         context="precursor target Excel",
         **kwargs,
     )
+    if data[list(TARGET_NUMERIC_COLUMNS)].isna().any().any():
+        raise InputValidationError("precursor target Excel: required numeric cells must not be empty")
+    if (data["下限"] > data["上限"]).any():
+        raise InputValidationError("precursor target Excel: lower m/z limit must not exceed upper limit")
+    return data
 
 
 def read_ms1_library(path: str | Path, **kwargs) -> pd.DataFrame:
@@ -209,22 +240,36 @@ def parse_ms2_text_to_dataframe(text_file: str | Path, encoding: str = "GBK") ->
     """
 
     path = Path(text_file)
+    return parse_ms2_spectrum_blocks(read_ms2_spectra_text(path, encoding=encoding), file_name=path.name)
+
+
+def parse_ms2_spectrum_blocks(blocks: Iterable[str], file_name: str = "") -> pd.DataFrame:
+    """Parse fragment arrays once for both the normalized API and legacy pipeline."""
+
     rows: list[dict[str, object]] = []
-    for block in read_ms2_spectra_text(path, encoding=encoding):
+    for block in blocks:
         target_match = re.search(r"target m/z,\s*([^,]+),\s*m/z", block)
         index_match = re.search(r"index:(.*?)\n", block)
         rt_match = re.search(r"scan start time,\s*([^,]+),", block)
         arrays = block.split("binaryDataArray:")[1:]
-        if not target_match or not index_match or len(arrays) < 2:
+        if not target_match:
             continue
+        if not index_match or len(arrays) < 2:
+            raise InputValidationError("MS/MS spectrum is missing a scan index or fragment arrays")
         mz_values = _parse_binary_values(arrays[0])
         intensity_values = _parse_binary_values(arrays[1])
+        if len(mz_values) != len(intensity_values):
+            raise InputValidationError(f"MS/MS scan {index_match.group(1).strip()}: m/z and intensity arrays have different lengths")
         precursor_mz = _to_float(target_match.group(1))
+        if precursor_mz is None:
+            raise InputValidationError("MS/MS spectrum contains an invalid precursor m/z")
         rt = _to_float(rt_match.group(1)) if rt_match else None
+        if rt_match and rt is None:
+            raise InputValidationError("MS/MS spectrum contains an invalid scan start time")
         for mz, intensity in zip(mz_values, intensity_values):
             rows.append(
                 {
-                    "file_name": path.name,
+                    "file_name": file_name,
                     "scan_id": index_match.group(1).strip(),
                     "precursor_mz": precursor_mz,
                     "rt": rt,
@@ -242,21 +287,21 @@ def parse_ms2_text_to_dataframe(text_file: str | Path, encoding: str = "GBK") ->
 def _parse_binary_values(block: str) -> list[float]:
     match = re.search(r"binary:\s*(.*)", block)
     if not match:
-        return []
+        raise InputValidationError("MS/MS fragment array is missing binary values")
     tokens = match.group(1).split()[1:]
-    if tokens and tokens[-1] == "":
-        tokens = tokens[:-1]
     values: list[float] = []
     for token in tokens:
         value = _to_float(token)
-        if value is not None:
-            values.append(value)
+        if value is None:
+            raise InputValidationError(f"MS/MS fragment array contains an invalid numeric value: {token!r}")
+        values.append(value)
     return values
 
 
 def _to_float(value: object) -> float | None:
     try:
-        return float(str(value).strip())
+        converted = float(str(value).strip())
+        return converted if isfinite(converted) else None
     except (TypeError, ValueError):
         return None
 

@@ -120,6 +120,7 @@ def select_inputs(app, tmp_path):
 
 
 def test_setup_controls_fit_at_minimum_window_size(app):
+    app.root.attributes("-alpha", 0)
     app.root.geometry("1000x640")
     app.root.deiconify()
     app.root.update()
@@ -195,3 +196,95 @@ def test_run_failure_restores_controls_and_shows_error(app, tmp_path, monkeypatc
     assert errors == ["invalid target table"]
     assert app.run_button.instate(["!disabled"])
     assert app.empty_title.cget("text") == "解析失败"
+
+
+def test_filename_braces_reach_backend_as_literal_names(app, tmp_path):
+    select_inputs(app, tmp_path)
+    txt = tmp_path / "input{sample}.txt"
+    txt.touch()
+    precursor = tmp_path / "targets{sample}.xlsx"
+    precursor.touch()
+    app.selection.txt_file = txt
+    app.selection.precursor_file = precursor
+    config = app._build_config()
+    assert config.text_pattern.format(i=1) == txt.name
+    assert config.target_pattern.format(i=1) == precursor.name
+
+
+def test_failed_import_retains_previous_result(app, tmp_path, monkeypatch):
+    source = tmp_path / "valid.xlsx"
+    result_workbook(source)
+    assert app._load_result_table(source)
+    errors = []
+    monkeypatch.setattr(gui.messagebox, "showerror", lambda *args, **kwargs: errors.append(args))
+    assert not app._load_result_table(tmp_path / "missing.xlsx")
+    assert errors and app.current_result == source
+    assert len(app.result_tree.get_children()) == 3
+
+
+def test_legacy_result_details_include_fragment_counts(app, tmp_path):
+    source = tmp_path / "legacy.xlsx"
+    pd.DataFrame({"注释": ["Cer(d18:1/16:0)"], "实际mz": [[100, 200]],
+                  "强度": [[50, 60]], "碎片": [["first", "second"]]}).to_excel(source, index=False)
+    assert app._load_result_table(source)
+    assert app.result_df.matched_fragment_count.tolist() == [2]
+    app.result_tree.selection_set("0")
+    app._on_result_select()
+    details = app.detail_text.get("1.0", tk.END)
+    assert "实际mz: [100, 200]" in details
+    assert "first" in details and "second" in details
+
+
+def test_queue_drain_is_bounded_and_remains_scheduled(app):
+    for number in range(250):
+        app.ui_queue.put(("log", (str(number), "Reading MS2 file")))
+    app.root.after_cancel(app.queue_after)
+    app._drain_queue()
+    assert app.ui_queue.qsize() == 150
+    assert app.queue_after in app.root.tk.splitlist(app.root.tk.call("after", "info"))
+
+
+def test_real_gui_run_processes_spectrum_after_upstream_merge(app, tmp_path):
+    from test_bug_regressions import _write_inputs
+    config = _write_inputs(tmp_path)
+    app.selection = gui.FileSelection(tmp_path / "hilic-msms-1.txt", tmp_path / "hilic-msms-1.xlsx",
+                                      config.ms1_library_path, config.output_dir)
+    app._refresh_selection_labels()
+    app._start_run()
+    deadline = time.monotonic() + 10
+    while app.running and time.monotonic() < deadline:
+        app.root.update()
+        time.sleep(.01)
+    assert not app.running
+    assert app.current_result == config.output_dir / config.final_result_name
+    assert not app.result_df.empty
+    assert app.result_df.matched_fragment_count.max() >= 2
+    assert app.export_button.instate(["!disabled"])
+
+
+def test_closing_during_analysis_keeps_export_running(app, monkeypatch):
+    warnings = []
+    monkeypatch.setattr(gui.messagebox, "showwarning", lambda *args, **kwargs: warnings.append(args))
+    app.running = True
+    try:
+        app._on_close()
+        assert warnings and not app.closed
+        assert app.root.winfo_exists()
+    finally:
+        app.running = False
+
+
+def test_worker_start_failure_restores_gui_controls(app, tmp_path, monkeypatch):
+    select_inputs(app, tmp_path)
+    errors = []
+    def fail_start(self):
+        raise RuntimeError("thread unavailable")
+    monkeypatch.setattr(gui.threading.Thread, "start", fail_start)
+    monkeypatch.setattr(gui.messagebox, "showerror", lambda title, text, **kwargs: errors.append(text))
+    app._start_run()
+    app.root.after_cancel(app.queue_after)
+    app._drain_queue()
+    assert not app.running
+    assert app.run_button.instate(["!disabled"])
+    assert all(control.instate(["!disabled"]) for control in app.input_controls)
+    assert "thread unavailable" in errors[0]

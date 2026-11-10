@@ -18,6 +18,7 @@ import pandas as pd
 
 from .config import SphinGOlipIDConfig
 from .ms2_pipeline import run_batch
+from .scoring import add_standard_score_columns
 
 
 APP_TITLE = "鞘脂质谱数据智能解析软件"
@@ -151,6 +152,7 @@ class SphinGOlipIDApp:
         self.selection = FileSelection()
         self.ui_queue: "queue.Queue[tuple[str, Any]]" = queue.Queue()
         self.running = False
+        self.closed = False
         self.current_result: Path | None = None
         self.result_df = pd.DataFrame()
         self.result_columns: list[str] = []
@@ -463,8 +465,10 @@ class SphinGOlipIDApp:
             precursor_dir=self.selection.precursor_file.parent,
             ms1_library_path=self.selection.ms1_db_file,
             output_dir=self.selection.output_dir,
-            file_indices=(1,), text_pattern=self.selection.txt_file.name,
-            target_pattern=self.selection.precursor_file.name, result_pattern="result.xlsx",
+            file_indices=(1,),
+            text_pattern=self.selection.txt_file.name.replace("{", "{{").replace("}", "}}"),
+            target_pattern=self.selection.precursor_file.name.replace("{", "{{").replace("}", "}}"),
+            result_pattern="result.xlsx",
             final_result_name="ms2_annotation_results.xlsx",
             save_intermediate=self.save_intermediate.get(),
             enable_rt_validation=False, enable_deduplication=False,
@@ -497,14 +501,18 @@ class SphinGOlipIDApp:
         self._set_detail("正在解析，完成后可选择候选查看详情。")
         self.show_results()
         self._append_log("开始解析。")
-        threading.Thread(target=self._run_backend, args=(config,), daemon=True).start()
+        try:
+            threading.Thread(target=self._run_backend, args=(config,), daemon=True).start()
+        except Exception as exc:
+            self.ui_queue.put(("error", f"无法启动后台解析：{exc}"))
 
     def _run_backend(self, config: SphinGOlipIDConfig) -> None:
         """Use a frozen config snapshot; the worker never reads Tk variables."""
         logger = logging.getLogger(f"sphingolipid_toolkit.gui.{id(self)}")
         logger.setLevel(logging.INFO)
         logger.propagate = False
-        logger.addHandler(QueueLogHandler(self.ui_queue))
+        handler = QueueLogHandler(self.ui_queue)
+        logger.addHandler(handler)
         try:
             results = run_batch(config, logger=logger)
             final_result = config.output_dir / config.final_result_name
@@ -514,9 +522,8 @@ class SphinGOlipIDApp:
         except Exception as exc:
             self.ui_queue.put(("error", str(exc)))
         finally:
-            for handler in list(logger.handlers):
-                logger.removeHandler(handler)
-                handler.close()
+            logger.removeHandler(handler)
+            handler.close()
 
     def _set_running_ui(self) -> None:
         state = tk.DISABLED if self.running else tk.NORMAL
@@ -535,8 +542,10 @@ class SphinGOlipIDApp:
         self._set_running_ui()
 
     def _drain_queue(self) -> None:
+        if self.closed:
+            return
         try:
-            while True:
+            for _ in range(100):
                 kind, payload = self.ui_queue.get_nowait()
                 if kind == "log":
                     line, message = payload
@@ -563,10 +572,12 @@ class SphinGOlipIDApp:
                     messagebox.showerror("解析失败", str(payload), parent=self.root)
         except queue.Empty:
             pass
-        if self.running:
-            seconds = int(monotonic() - self.run_started)
-            self.run_status.set(f"解析中 · {self.run_stage} · 已用时 {seconds // 60:02d}:{seconds % 60:02d}")
-        self.queue_after = self.root.after(120, self._drain_queue)
+        finally:
+            if not self.closed:
+                if self.running:
+                    seconds = int(monotonic() - self.run_started)
+                    self.run_status.set(f"解析中 · {self.run_stage} · 已用时 {seconds // 60:02d}:{seconds % 60:02d}")
+                self.queue_after = self.root.after(120, self._drain_queue)
 
     def _append_log(self, text: str) -> None:
         self.log_text.configure(state=tk.NORMAL)
@@ -576,7 +587,7 @@ class SphinGOlipIDApp:
 
     def _load_result_table(self, path: Path) -> bool:
         try:
-            frame = pd.read_excel(path)
+            frame = add_standard_score_columns(pd.read_excel(path))
         except Exception as exc:
             messagebox.showerror("打开失败", str(exc), parent=self.root)
             return False
@@ -708,8 +719,12 @@ class SphinGOlipIDApp:
         return text if len(text) <= limit else text[:limit - 3] + "..."
 
     def _on_close(self) -> None:
-        if self.running and not messagebox.askyesno("正在解析", "关闭窗口会中断当前解析，是否关闭？", parent=self.root):
+        if self.closed:
             return
+        if self.running:
+            messagebox.showwarning("正在解析", "请等待解析完成后再关闭窗口，避免中断结果写入。", parent=self.root)
+            return
+        self.closed = True
         self.root.after_cancel(self.queue_after)
         if self.filter_after is not None:
             self.root.after_cancel(self.filter_after)
