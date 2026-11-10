@@ -36,7 +36,7 @@ def test_fractional_or_boolean_file_indices_are_rejected(tmp_path, indices, conf
 def test_result_and_log_collision_is_rejected_before_modifying_files(tmp_path):
     config = _write_inputs(tmp_path)
     conflicting = SphinGOlipIDConfig.from_single_input_dir(tmp_path, config.output_dir, config.ms1_library_path,
-                                                         file_indices=(1,), log_file_name="ms2_annotation_results.xlsx",backend="legacy")
+                                                         file_indices=(1,), log_file_name="ms2_annotation_results.xlsx")
     config.output_dir.mkdir()
     original = config.output_dir / conflicting.log_file_name
     original.write_bytes(b"previous result")
@@ -59,7 +59,7 @@ def test_missing_later_input_is_detected_before_first_result_is_overwritten(tmp_
     config = _write_inputs(tmp_path)
     result = run_batch(config)[0]
     original = result.read_bytes()
-    batch = SphinGOlipIDConfig.from_single_input_dir(tmp_path, config.output_dir, config.ms1_library_path, file_indices=(1, 2),backend="legacy")
+    batch = SphinGOlipIDConfig.from_single_input_dir(tmp_path, config.output_dir, config.ms1_library_path, file_indices=(1, 2))
     with pytest.raises(FileNotFoundError, match="index 2"):
         run_batch(batch)
     assert result.read_bytes() == original
@@ -176,28 +176,27 @@ def _targeted_inputs(tmp_path):
     _write_mzml(tmp_path / "sample.MZML")
     library = tmp_path / "library.xlsx"
     pd.DataFrame({"理论值": [500.], "classy": ["Cer"], "name": ["Cer(d34:1)"], "structure": [""]}).to_excel(library, index=False)
-    return TargetedMzMLConfig(tmp_path, library, tmp_path / "out",backend="legacy")
+    return TargetedMzMLConfig(tmp_path, library, tmp_path / "out")
 
 
 def test_targeted_batch_reads_real_mzml_binary_data_and_bom_targetlist(tmp_path):
-    config = _targeted_inputs(tmp_path)
-    logger = logging.getLogger(f"test.real_mzml.{tmp_path.name}")
-    outputs = run_targeted_mzml_batch(config, logger=logger)
-    assert all(path.is_file() for path in outputs.values())
-    raw = pd.read_excel(outputs["raw_identifications"])
-    assert not raw.empty
-    assert raw.ms2_rt.tolist() == [1.25] * len(raw)
-    assert raw.matched_fragment_count.max() >= 2
-    assert raw.ms1_library_mz_error_ppm.notna().all()
-    assert raw.ms1_library_mz_error_ppm.max() <= config.ms1_candidate_ppm
-    assert not pd.read_excel(outputs["rt_fitted_identifications"]).empty
-    assert not any(isinstance(handler, logging.FileHandler) for handler in logger.handlers)
+    from test_reference_engine import write_native_mzml
+    write_native_mzml(tmp_path/'sample.mzML')
+    targets=tmp_path/'targetlist';targets.mkdir()
+    measured=538.5199*(1+5e-6)
+    (targets/'sample.csv').write_text('TargetedMSMSTable,,\nOn,Prec. m/z,Ret. Time (min)\nTRUE,'+str(measured)+','+str(61/60)+'\n',encoding='utf-8-sig')
+    result=run_targeted_mzml_batch(TargetedMzMLConfig(tmp_path,None,tmp_path/'out'))
+    data=pd.read_excel(result['raw_identifications'])
+    assert data.matched_name.tolist()==['Cer(d18:1/16:0)']
+    assert data.precursor_mz_source.tolist()==['MS1_REFERENCE_CENTROID']
+    assert data.ms2_scan_id.tolist()==['scan=2']
+    assert data.collision_energy.tolist()==[60.]
 
 
 def test_targeted_output_cannot_overwrite_library(tmp_path):
     config = _targeted_inputs(tmp_path)
     original = config.ms1_library_path.read_bytes()
-    config = TargetedMzMLConfig(tmp_path, config.ms1_library_path, tmp_path, feature_table_name="library.xlsx",backend="legacy")
+    config = TargetedMzMLConfig(tmp_path, config.ms1_library_path, tmp_path, feature_table_name="library.xlsx")
     with pytest.raises(InputValidationError, match="overwrite"):
         run_targeted_mzml_batch(config)
     assert config.ms1_library_path.read_bytes() == original
@@ -215,4 +214,4 @@ def test_targeted_missing_mzml_is_reported_before_export(tmp_path):
 @pytest.mark.parametrize("changes", [{"feature_mz_ppm": -1}, {"feature_rt_tolerance_min": float("nan")}, {"rt_fit_residual_threshold": 0}])
 def test_targeted_matching_settings_are_validated(tmp_path, changes):
     with pytest.raises(ValueError):
-        TargetedMzMLConfig(tmp_path, tmp_path / "library.xlsx", tmp_path / "out", **changes,backend="legacy")
+        TargetedMzMLConfig(tmp_path, tmp_path / "library.xlsx", tmp_path / "out", **changes)

@@ -62,8 +62,7 @@ def test_text_production_uses_reference_engine_without_legacy_filters(cer_index,
         'binaryDataArray:','binary: 0 264.2686','binaryDataArray:','binary: 0 100.0',
     ]),encoding='utf-8')
     pd.DataFrame(dict(target=[538.5199],下限=[538.51],上限=[538.53],RT=[1.25],Abund=[1000.])).to_excel(raw/'hilic-msms-1.xlsx',index=False)
-    config=SphinGOlipIDConfig(raw,raw,None,tmp_path/'out',file_indices=(1,),ms2_library_path=cer_index,
-        min_fragment_intensity=1e9,min_matched_fragments=999,min_match_score=1.)
+    config=SphinGOlipIDConfig(raw,raw,None,tmp_path/'out',file_indices=(1,),ms2_library_path=cer_index)
     result=pd.read_excel(run_batch(config)[0])
     assert len(result)==1
     assert result.annotation_engine.iloc[0]=='SphinGOlipID'

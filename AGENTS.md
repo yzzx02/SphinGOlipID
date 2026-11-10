@@ -7,8 +7,12 @@ explicit request. The imported reference baseline is
 
 The authoritative identification entry points are `engine.py`,
 `reference_pipeline.py`, the GUI and the three CLI commands documented in
-README. They use the isolated reference engine by default. `backend=legacy`
-is an explicit compatibility route, not the scientific production default.
+README. They all use the isolated current reference engine. The old notebook
+backend, experimental scorer and legacy selector are retired; reject retired
+score/intensity/count parameters rather than silently accepting them. The
+compatibility MS2PipelineConfig constructor also uses the current engine.
+Archived evidence schema objects are read-only historical vocabulary, never a
+source of current fragments, gates or scores.
 Keep and improve SphinGOlipID's existing frontend. Do not migrate LipidGate's
 frontend, layouts or Qt application; adapt only the existing UI's backend calls
 and necessary parameter/result fields.

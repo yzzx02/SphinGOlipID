@@ -1,0 +1,69 @@
+{
+  "revision": "sphingolipid-current-backend-20261110",
+  "version": "0.5.0",
+  "previous_checkpoint": "a8fc7fe8fe2c29bbb9e21bd7b1226966b454faa8",
+  "current_backend_only": true,
+  "retired_selectors_rejected": true,
+  "retired_score_count_intensity_parameters_rejected": true,
+  "scientific_changes": false,
+  "library_changes": false,
+  "existing_frontend_retained": true,
+  "frontend_change": "Only reject retired matching parameters",
+  "protected_snapshot_and_data_files_unchanged": 87,
+  "source_original_and_branch_library_hashes_verified": true,
+  "scientific_engine_manifest": "config/engine_revision.json",
+  "tests": {
+    "passed": 997,
+    "ported_scientific_regression_cases": 738,
+    "synthetic_indexed_equivalence_cases": 74,
+    "results_scores_order_and_evidence_equal": true
+  },
+  "isolated_wheel": {
+    "package_version": "0.5.0",
+    "upstream_application_imports_blocked": true,
+    "optional_openms_and_qt_imports_blocked": true,
+    "positive_and_negative_libraries": {
+      "+": {
+        "results": 1,
+        "scores": [
+          100.0
+        ]
+      },
+      "-": {
+        "results": 1,
+        "scores": [
+          100.0
+        ]
+      }
+    },
+    "reference_names": 79262,
+    "native_mzml_cli_passed": true
+  },
+  "reference_only_types_unchanged": [
+    "1-O-acetyl-Cer",
+    "1-O-acetyl-ω-linoleoyloxy-Cer",
+    "3-keto Cer",
+    "LM1",
+    "N,N,N-trimethylSo",
+    "N,N-dimethylSo",
+    "N-methylSo",
+    "ketoSo"
+  ],
+  "runtime_sha256_encoding": "UTF-8 with normalized LF line endings",
+  "runtime_sha256": {
+    "backend_policy": "fff2f2ab9431e4917912392438c2c48cd29c658753243a1a62dbe7899efcb844",
+    "config": "0c30cf8e87e2c4c11902d6d7ccf2f23e64532bdb7c54a6f6f447fda347ca4d50",
+    "ms2_pipeline": "721d7e27a731650f897bb682d9b89373976d21fafed90a91d806118971759361",
+    "targeted_mzml_pipeline": "e5e389bbcf4dbc2f00555250b015164c7696f5861c521a672f74fc10708fd85c",
+    "reference_pipeline": "c34546eb986adf3226e639de7da21fe1e32882ca5326be5a73dc3015fe554ba3",
+    "cli": "be4c9b612ea52abf12cce9cb47e3b890baf8f5b51a6b37fafbbc9cff13bc966f",
+    "gui": "d835495f7cb5892408806dbadf5b1c43f8a2fee8ce3f831cbf4be5c7e0a67575",
+    "io_utils": "8d7b3cdebfaacf2922b590736da9b83aee2923701a8e830e0343b63b2ffca336",
+    "ms2_legacy_core": "aea399a87d39b9a8c9c6c3ea55223bebc158fc49c930a2b97f6ae5fe484d92d1",
+    "evidence": "e3329067b0cf899099bbe5be2bd429492b501629962b52c83c3874920ce1b948",
+    "evidence_config": "06561d6095d0db2cce87c7cd68f3a1251291e88598455b38f6ff0aa956e793d2",
+    "multi_evidence_adapter": "40515f410bbd2129d17cccbdd66a165b3dad599fd56d7065f073b2178bd501d7",
+    "multi_evidence_scoring": "06df6df88e8a628cb7b9714029ad8e497459aa3e040aa40af069c07b23a118c5"
+  },
+  "main_merged": false
+}

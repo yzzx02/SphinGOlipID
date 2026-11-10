@@ -11,7 +11,7 @@ def test_run_one_file_reports_missing_ms2_text(tmp_path):
         output_dir=tmp_path / "out",
         ms1_library_path=tmp_path / "library.xlsx",
         file_indices=(1,),
-    backend="legacy")
+    )
 
     with pytest.raises(FileNotFoundError, match="Missing required MS/MS txt file"):
         run_one_file(config, 1)
@@ -32,30 +32,17 @@ def test_legacy_ms2_pipeline_config_exposes_unified_names(tmp_path):
     assert config.file_indices == (1,)
 
 
-def test_run_batch_writes_v03_acceptance_outputs(tmp_path):
-    raw_dir = tmp_path / "raw"
-    precursor_dir = tmp_path / "precursors"
-    output_dir = tmp_path / "out"
-    raw_dir.mkdir()
-    precursor_dir.mkdir()
-    _write_mock_ms2_text(raw_dir / "hilic-msms-1.txt")
-    _write_mock_precursor_table(precursor_dir / "hilic-msms-1.xlsx")
-    library = tmp_path / "library.xlsx"
-    _write_mock_ms1_library(library)
-
-    config = SphinGOlipIDConfig(
-        raw_ms2_dir=raw_dir,
-        precursor_dir=precursor_dir,
-        ms1_library_path=library,
-        output_dir=output_dir,
-        file_indices=(1,),
-    backend="legacy")
-    results = run_batch(config)
-
-    assert results == [output_dir / "result_msms-1.xlsx"]
-    assert (output_dir / "ms2_annotation_results.xlsx").is_file()
-    assert (output_dir / "run_log.txt").is_file()
-    assert (output_dir / "intermediate").is_dir()
+def test_run_batch_writes_current_engine_outputs(tmp_path):
+    from test_bug_regressions import _write_inputs
+    config=_write_inputs(tmp_path)
+    result=run_batch(config)
+    assert len(result)==1
+    data=pd.read_excel(result[0])
+    assert data.annotation_engine.tolist()==['SphinGOlipID']
+    assert data.matched_name.tolist()==['Cer(d18:1/16:0)']
+    assert {'lcb_score','other_score','result_rank','ms2_evidence_json'}<=set(data.columns)
+    assert (config.output_dir/config.final_result_name).exists()
+    assert not (config.output_dir/'intermediate/out_DB.csv').exists()
 
 
 def _write_mock_ms2_text(path):

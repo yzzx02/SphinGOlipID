@@ -8,20 +8,19 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Iterable, Iterator, Sequence
 
 import numpy as np
 import pandas as pd
 from pyteomics import mzml
 
-from . import ms2_legacy_core as core
+from .backend_policy import removed_backend
 from .config import TARGETED_FRAGMENT_PPM, validate_matching_parameters
-from .fragment_assignment import select_one_to_one_edges
 from .glycan_encoding import parse_glycan_encoding
 from .io_utils import (
     InputValidationError, MS1_LIBRARY_REQUIRED_COLUMNS, coerce_numeric_columns,
     ensure_output_dir, read_ms1_library, require_file, write_excel_atomic,
+    protected_library_paths,
 )
 from .logging_utils import attach_file_handler, configure_logging, get_logger
 from .rt_validation import add_series_columns, fit_ransac_models, predict_rt
@@ -33,14 +32,14 @@ class TargetedMzMLConfig:
     """Configuration for annotating targeted mzML MS2 data to MS1 features."""
 
     data_dir: Path
-    ms1_library_path: Path
+    ms1_library_path: Path | None
     output_dir: Path
     targetlist_dir: Path | None = None
     mzml_dir: Path | None = None
     fragment_ppm: float = TARGETED_FRAGMENT_PPM
-    min_fragment_intensity: float = 20.0
-    min_matched_fragments: int = 2
-    min_match_score: float = 0.35
+    min_fragment_intensity: float | None = None
+    min_matched_fragments: int | None = None
+    min_match_score: float | None = None
     top_n: int = 3
     ms1_candidate_ppm: float = 10.0
     feature_mz_ppm: float = 10.0
@@ -62,11 +61,6 @@ class TargetedMzMLConfig:
 
     def __post_init__(self) -> None:
         validate_matching_parameters(self)
-        if self.backend not in {"lipidgate", "legacy"}:
-            raise ValueError("backend must be lipidgate or legacy")
-        if self.backend == "lipidgate":
-            from .engine import config_from_workflow
-            config_from_workflow(self)
         for name in ("ms1_candidate_ppm", "feature_mz_ppm", "feature_rt_tolerance_min", "feature_merge_ppm",
                      "feature_merge_mz_tolerance_da", "feature_merge_rt_tolerance_min", "rt_fit_residual_threshold"):
             value = getattr(self, name)
@@ -77,8 +71,6 @@ class TargetedMzMLConfig:
         object.__setattr__(self, "data_dir", Path(self.data_dir))
         if self.ms1_library_path is not None:
             object.__setattr__(self, "ms1_library_path", Path(self.ms1_library_path))
-        elif self.backend == 'legacy':
-            raise ValueError('The legacy backend requires an MS1 library')
         object.__setattr__(self, "output_dir", Path(self.output_dir))
         if self.targetlist_dir is None:
             object.__setattr__(self, "targetlist_dir", Path(self.data_dir) / "targetlist")
@@ -136,13 +128,12 @@ def _find_input_files(directory: str | Path, suffix: str) -> list[Path]:
 
 def _validate_targeted_paths(config: TargetedMzMLConfig) -> None:
     from .engine import library_path
-    library = require_file(config.ms1_library_path if config.backend == 'legacy' else
-        config.ms2_library_path or library_path('+'), "MS2 library" if config.backend!='legacy' else "MS1 theoretical library")
+    library = require_file(config.ms2_library_path or library_path('+'), 'MS2 sphingolipid library')
     targetlists = _find_input_files(config.targetlist_dir, ".csv")
     spectra = _find_input_files(config.mzml_dir, ".mzml")
     if not targetlists or not spectra:
         raise InputValidationError("Targeted workflow requires targetlist CSV files and mzML files")
-    inputs = {path.resolve() for path in [library, *targetlists, *spectra]}
+    inputs = protected_library_paths(config) | {path.resolve() for path in [library, *targetlists, *spectra]}
     outputs = [(config.output_dir / getattr(config, name)).resolve() for name in
                ("log_file_name", "raw_result_name", "fitted_result_name", "feature_table_name", "raw_targetlist_name")]
     if any(path in inputs for path in outputs):
@@ -157,6 +148,7 @@ def run_targeted_mzml_batch(
 ) -> dict[str, Path]:
     """Run the complete targeted mzML annotation workflow."""
 
+    validate_matching_parameters(config)
     _validate_targeted_paths(config)
     logger = logger or get_logger("sphingolipid_toolkit.targeted_mzml")
     output_dir = ensure_output_dir(config.output_dir)
@@ -182,9 +174,7 @@ def _run_targeted_mzml_batch(config: TargetedMzMLConfig, logger: logging.Logger)
         mz_tolerance_ppm=config.feature_merge_ppm,
         rt_tolerance_min=config.feature_merge_rt_tolerance_min,
     )
-    logger.info("Loading MS1 theoretical library")
-    library = (_read_legacy_or_normalized_ms1_library(config.ms1_library_path)
-               if config.backend == "legacy" else pd.DataFrame())
+    library = pd.DataFrame()
     write_excel_atomic(targetlist_raw, output_dir / config.raw_targetlist_name, index=False)
     write_excel_atomic(features, output_dir / config.feature_table_name, index=False)
 
@@ -318,49 +308,13 @@ def build_ms1_feature_table(
     return pd.DataFrame(rows)
 
 
-def annotate_mzml_directory(
-    features: pd.DataFrame,
-    library: pd.DataFrame,
-    config: TargetedMzMLConfig,
-    logger: logging.Logger | None = None,
-) -> pd.DataFrame:
-    """Annotate every MS2 spectrum in all mzML files and return long-form rows."""
-
-    logger = logger or get_logger("sphingolipid_toolkit.targeted_mzml")
-    if config.backend == "lipidgate":
-        from .reference_pipeline import annotate_targeted_directory
-        return annotate_targeted_directory(features, config, logger)
-    mzml_files = _find_input_files(config.mzml_dir, ".mzml")
-    rows: list[pd.DataFrame] = []
-    with TemporaryDirectory(prefix="sphingolipid_targeted_") as temp_dir:
-        fragment_cache: dict[str, pd.DataFrame] = {}
-        for mzml_file in mzml_files:
-            logger.info("Reading mzML file: %s", mzml_file)
-            for spectrum in iter_ms2_spectra(mzml_file):
-                feature = find_matching_feature(
-                    features,
-                    precursor_mz=spectrum.precursor_mz,
-                    ms2_rt=spectrum.ms2_rt,
-                    mz_tolerance_ppm=config.feature_mz_ppm,
-                    rt_tolerance_min=config.feature_rt_tolerance_min,
-                )
-                if feature is None:
-                    continue
-                annotated = annotate_one_spectrum(
-                    spectrum,
-                    feature,
-                    library,
-                    config,
-                    temp_dir=Path(temp_dir),
-                    fragment_cache=fragment_cache,
-                    logger=logger,
-                )
-                if not annotated.empty:
-                    rows.append(annotated)
-    result = pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
-    if not result.empty:
-        result.insert(0, "identification_id", [f"ID{i:08d}" for i in range(1, len(result) + 1)])
-    return result
+def annotate_mzml_directory(features,library,config,logger=None):
+    """Annotate only with the current curated MS2 library and shared gates."""
+    validate_matching_parameters(config)
+    if library is not None and not library.empty:
+        removed_backend()
+    from .reference_pipeline import annotate_targeted_directory
+    return annotate_targeted_directory(features,config,logger or get_logger('sphingolipid_toolkit.targeted_mzml'))
 
 
 def iter_ms2_spectra(mzml_file: str | Path) -> Iterator[MS2Spectrum]:
@@ -414,79 +368,15 @@ def find_matching_feature(
     return candidates.sort_values("_distance").iloc[0].drop(labels=["_distance"])
 
 
-def annotate_one_spectrum(
-    spectrum: MS2Spectrum,
-    feature: pd.Series,
-    library: pd.DataFrame,
-    config: TargetedMzMLConfig,
-    temp_dir: Path,
-    fragment_cache: dict[str, pd.DataFrame] | None = None,
-    logger: logging.Logger | None = None,
-) -> pd.DataFrame:
-    """Annotate one MS2 spectrum against legacy-generated candidate fragments."""
-
-    logger = logger or get_logger("sphingolipid_toolkit.targeted_mzml")
-    if config.backend == "lipidgate":
-        from .engine import SphingolipidIdentifier, config_from_workflow
-        from .reference_pipeline import annotate_targeted_spectrum
-        with SphingolipidIdentifier(config_from_workflow(config)) as identifier:
-            return annotate_targeted_spectrum(spectrum, feature, config, identifier)
-    feature_id = str(feature["feature_id"])
-    logger.debug("Effective fragment_ppm=%s for scan %s", config.fragment_ppm, spectrum.scan_id)
-    candidates = search_ms1_candidates(
-        library,
-        observed_mz=float(feature["feature_mz"]),
-        tolerance_ppm=config.ms1_candidate_ppm,
-        ms1_rt=float(feature["ms1_rt"]),
-    )
-    if candidates.empty:
-        return pd.DataFrame()
-
-    cache = fragment_cache if fragment_cache is not None else {}
-    if feature_id not in cache:
-        cache[feature_id] = generate_legacy_fragments_for_candidates(
-            candidates,
-            observed_mz=float(feature["feature_mz"]),
-            ms1_rt=float(feature["ms1_rt"]),
-            abundance=float(feature.get("targetlist_row_count", 1)),
-            temp_dir=temp_dir,
-            logger=logger,
-        )
-    theoretical = cache[feature_id]
-    if theoretical.empty:
-        return pd.DataFrame()
-
-    matched = match_observed_to_theoretical(
-        spectrum,
-        theoretical,
-        fragment_tolerance_fraction=config.fragment_tolerance_fraction,
-        min_fragment_intensity=config.min_fragment_intensity,
-    )
-    result = finalize_spectrum_matches(
-        matched,
-        min_matched_fragments=config.min_matched_fragments,
-        min_match_score=config.min_match_score,
-        top_n=config.top_n,
-    )
-    if result.empty:
-        return result
-
-    result = add_standard_score_columns(result)
-    lipid_col = "lipid_name" if "lipid_name" in result.columns else "注释"
-    candidate_errors = candidates.groupby("name")["ms1_library_mz_error_ppm"].min()
-    errors = result["母离子"].map(candidate_errors) if "母离子" in result else result[lipid_col].map(candidate_errors)
-    result["ms1_library_mz_error_ppm"] = errors.fillna(result[lipid_col].map(candidate_errors))
-    for col, value in feature.items():
-        result[col] = value
-    result["ms2_rt"] = spectrum.ms2_rt
-    result["ms2_precursor_mz"] = spectrum.precursor_mz
-    result["ms2_scan_id"] = spectrum.scan_id
-    result["ms2_file"] = str(spectrum.mzml_file)
-    result["ms2_file_name"] = spectrum.mzml_file.name
-    result["collision_energy"] = spectrum.collision_energy
-    result["ms1_rt"] = float(feature["ms1_rt"])
-    result["feature_mz"] = float(feature["feature_mz"])
-    return result
+def annotate_one_spectrum(spectrum,feature,library,config,temp_dir=None,fragment_cache=None,logger=None):
+    """Use the current indexed engine; an MS1 table cannot generate MS2 rules."""
+    validate_matching_parameters(config)
+    if library is not None and not library.empty:
+        removed_backend()
+    from .engine import SphingolipidIdentifier,config_from_workflow
+    from .reference_pipeline import annotate_targeted_spectrum
+    with SphingolipidIdentifier(config_from_workflow(config)) as identifier:
+        return annotate_targeted_spectrum(spectrum,feature,config,identifier)
 
 
 def search_ms1_candidates(
@@ -510,156 +400,16 @@ def search_ms1_candidates(
     return candidates
 
 
-@core.synchronized_legacy_runtime
-def generate_legacy_fragments_for_candidates(
-    candidates: pd.DataFrame,
-    observed_mz: float,
-    ms1_rt: float,
-    abundance: float,
-    temp_dir: Path,
-    logger: logging.Logger | None = None,
-) -> pd.DataFrame:
-    """Generate theoretical fragments by calling the legacy fragment rules."""
-
-    logger = logger or get_logger("sphingolipid_toolkit.targeted_mzml")
-    temp_dir.mkdir(parents=True, exist_ok=True)
-    out_db = temp_dir / "out_DB.csv"
-    if out_db.exists():
-        out_db.unlink()
-    old_folder = core.folder
-    core.folder = str(temp_dir) + os.sep
-    try:
-        for _, row in candidates.iterrows():
-            core.frag_id1 = ["[C2H5NO+H]+"]
-            core.frag_mz1 = [60.044]
-            structure = row.get("structure", "")
-            classy = row["classy"]
-            if isinstance(structure, str) and structure and not re.match(r"^[a-zA-Z]", str(classy)):
-                # A malformed encoding is an input error, not an absent match.
-                parse_glycan_encoding(structure, classy)
-            try:
-                core.learn_fuc(
-                    row["classy"],
-                    row["name"],
-                    structure,
-                    float(observed_mz),
-                    float(ms1_rt),
-                    float(abundance),
-                )
-            except Exception as exc:
-                logger.debug("Skipping candidate %s during legacy fragment generation: %s", row.get("name"), exc)
-    finally:
-        core.folder = old_folder
-    if not out_db.exists() or out_db.stat().st_size == 0:
-        return pd.DataFrame()
-    fragments = pd.read_csv(out_db, header=None)
-    fragments.columns = ["idf", "mz", "anno", "total", "target", "lenDB", "RT", "Abund"]
-    fragments["mz"] = pd.to_numeric(fragments["mz"], errors="coerce")
-    fragments = fragments.dropna(subset=["mz"])
-    deduplicated = []
-    for _, group in fragments.groupby("anno", sort=False):
-        group = group.copy()
-        labels = group.groupby("mz")["idf"].agg(lambda xs: " | ".join(sorted(set(xs.astype(str)))))
-        group["idf"] = group["mz"].map(labels)
-        deduplicated.append(group.drop_duplicates(subset="mz"))
-    return pd.concat(deduplicated, ignore_index=True) if deduplicated else pd.DataFrame(columns=fragments.columns)
+def generate_legacy_fragments_for_candidates(*args,**kwargs):
+    removed_backend()
 
 
-def match_observed_to_theoretical(
-    spectrum: MS2Spectrum,
-    theoretical: pd.DataFrame,
-    fragment_tolerance_fraction: float,
-    min_fragment_intensity: float,
-) -> pd.DataFrame:
-    """Match one observed MS2 spectrum to legacy theoretical fragments."""
-
-    observed_mz = spectrum.fragment_mz
-    observed_intensity = spectrum.fragment_intensity
-    keep = np.isfinite(observed_mz) & np.isfinite(observed_intensity) & (observed_intensity >= min_fragment_intensity)
-    observed_mz = observed_mz[keep]
-    observed_intensity = observed_intensity[keep]
-    if len(observed_mz) == 0 or theoretical.empty:
-        return pd.DataFrame()
-
-    theory = theoretical.copy()
-    theory["low"] = theory["mz"] * (1 - fragment_tolerance_fraction)
-    theory["up"] = theory["mz"] * (1 + fragment_tolerance_fraction)
-    rows: list[pd.DataFrame] = []
-    lows = theory["low"].to_numpy(dtype=float)
-    ups = theory["up"].to_numpy(dtype=float)
-    for observed_id, (mz_value, intensity_value) in enumerate(zip(observed_mz, observed_intensity)):
-        mask = (lows <= mz_value) & (ups >= mz_value)
-        if not np.any(mask):
-            continue
-        matched = theory.loc[mask].copy()
-        matched["idx"] = spectrum.scan_id
-        matched["_observed_id"] = observed_id
-        matched["_observed_mz"] = float(mz_value)
-        matched["_observed_intensity"] = float(intensity_value)
-        matched["relmz"] = round(float(mz_value), 4)
-        matched["intense"] = round(float(intensity_value), 4)
-        matched["fragment_error_ppm"] = (matched["mz"].astype(float) - float(mz_value)).abs() / matched["mz"].astype(float).abs().clip(lower=1e-12) * 1_000_000
-        rows.append(matched)
-    if not rows:
-        return pd.DataFrame()
-    return select_one_to_one_edges(
-        pd.concat(rows, ignore_index=True), observed_cols=["idx", "_observed_id"],
-        observed_mz_col="_observed_mz", intensity_col="_observed_intensity",
-        theoretical_mz_col="mz", candidate_cols=["anno"], label_col="idf",
-    )
+def match_observed_to_theoretical(*args,**kwargs):
+    removed_backend()
 
 
-def finalize_spectrum_matches(
-    matched: pd.DataFrame,
-    min_matched_fragments: int,
-    min_match_score: float,
-    top_n: int,
-) -> pd.DataFrame:
-    """Apply the same coverage/intensity ranking used by the legacy workflow."""
-
-    if matched.empty:
-        return pd.DataFrame()
-    matched = select_one_to_one_edges(
-        matched, observed_cols=["idx", "_observed_id"] if "_observed_id" in matched else ["idx", "relmz", "intense"],
-        observed_mz_col="_observed_mz" if "_observed_mz" in matched else "relmz",
-        intensity_col="_observed_intensity" if "_observed_intensity" in matched else "intense",
-        theoretical_mz_col="mz", candidate_cols=["anno"], label_col="idf",
-    )
-    cleaned_frames = [
-        group.sort_values("intense", ascending=False).drop_duplicates("mz", keep="first")
-        for _, group in matched.groupby("anno", sort=False)
-    ]
-    cleaned_data = pd.concat(cleaned_frames, ignore_index=True) if cleaned_frames else pd.DataFrame(columns=matched.columns)
-    fragment_error_summary = pd.DataFrame()
-    if "fragment_error_ppm" in cleaned_data.columns and not cleaned_data.empty:
-        fragment_error_summary = cleaned_data.groupby("anno")["fragment_error_ppm"].agg(
-            fragment_error_ppm_mean="mean",
-            fragment_error_ppm_max="max",
-        )
-    middle_frames = [core.process_group(group) for _, group in cleaned_data.groupby("anno", sort=False)]
-    middle = pd.concat(middle_frames, ignore_index=True) if middle_frames else pd.DataFrame()
-    if middle.empty:
-        return middle
-    if not fragment_error_summary.empty:
-        middle = middle.merge(fragment_error_summary, left_on="注释", right_index=True, how="left")
-    middle = middle[middle["实际mz"].apply(lambda values: len(values) >= min_matched_fragments)]
-    middle = middle[middle["匹配度分数"] >= min_match_score]
-    if middle.empty:
-        return middle
-    middle["强度总和"] = middle["强度"].apply(sum)
-    result = pd.DataFrame()
-    for _, group in middle.groupby("target"):
-        group = group.sort_values(by="强度总和", ascending=False)
-        rank = group["强度总和"].rank(method="dense", ascending=False)
-        group["总分数"] = (100 - (rank - 1) * 10) * group["匹配度分数"]
-        max_intensity = group["强度总和"].max()
-        group["相对强度"] = (group["强度总和"] / max_intensity).round(2)
-        selected = group.sort_values(
-            ["总分数", "匹配度分数", "强度总和", "注释"],
-            ascending=[False, False, False, True], kind="stable",
-        ).head(top_n)
-        result = pd.concat([result, selected], ignore_index=True)
-    return result.reset_index(drop=True)
+def finalize_spectrum_matches(*args,**kwargs):
+    removed_backend()
 
 
 def apply_rt_fit_filter(results: pd.DataFrame, config: TargetedMzMLConfig) -> pd.DataFrame:
@@ -915,16 +665,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--data-dir", required=True, type=Path, help="Root folder containing targetlist/ and mzML files.")
     parser.add_argument("--targetlist-dir", type=Path, default=None, help="Folder containing Agilent targetlist CSV files.")
     parser.add_argument("--mzml-dir", type=Path, default=None, help="Folder containing mzML files. Defaults to --data-dir.")
-    parser.add_argument("--ms1-db", type=Path, help="MS1 Excel/CSV library; required only for --backend legacy.")
     parser.add_argument("--output-dir", required=True, type=Path, help="Output folder.")
     parser.add_argument("--fragment-ppm", type=float, default=TARGETED_FRAGMENT_PPM, help=f"MS2 fragment matching tolerance in ppm. Default: {TARGETED_FRAGMENT_PPM:g}.")
     parser.add_argument("--ms1-ppm", type=float, default=10.0, help="MS1 library candidate tolerance in ppm. Default: 10.")
     parser.add_argument("--feature-ppm", type=float, default=10.0, help="mzML precursor to targetlist feature tolerance in ppm. Default: 10.")
-    parser.add_argument("--min-intensity", type=float, default=20.0)
-    parser.add_argument("--min-fragments", type=int, default=2)
-    parser.add_argument("--min-score", type=float, default=0.35)
     parser.add_argument("--top-n", type=int, default=3)
-    parser.add_argument("--backend",choices=("lipidgate","legacy"),default="lipidgate")
     parser.add_argument("--ms2-library",type=Path)
     parser.add_argument("--fragment-da",type=float)
     parser.add_argument("--min-total-score",type=float,default=50.)
@@ -936,16 +681,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         data_dir=args.data_dir,
         targetlist_dir=args.targetlist_dir,
         mzml_dir=args.mzml_dir,
-        ms1_library_path=args.ms1_db,
+        ms1_library_path=None,
         output_dir=args.output_dir,
         fragment_ppm=args.fragment_ppm,
         ms1_candidate_ppm=args.ms1_ppm,
         feature_mz_ppm=args.feature_ppm,
-        min_fragment_intensity=args.min_intensity,
-        min_matched_fragments=args.min_fragments,
-        min_match_score=args.min_score,
         top_n=args.top_n,
-        backend=args.backend,
         ms2_library_path=args.ms2_library,
         fragment_da=args.fragment_da,
         min_total_score=args.min_total_score,

@@ -27,15 +27,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Folder containing precursor target Excel files. Defaults to --input-dir.",
     )
     parser.add_argument("--output-dir", required=True, type=Path, help="Folder where result_msms-{i}.xlsx files will be written.")
-    parser.add_argument("--ms1-db", type=Path, help="MS1 Excel database, required only with --backend legacy.")
     parser.add_argument("--files", default="1-6", help="File indices to process, e.g. 1-6 or 1,3,5.")
     parser.add_argument("--encoding", default="GBK", help="Encoding of exported MS/MS txt files. Default: GBK.")
     parser.add_argument("--fragment-ppm", type=float, default=LEGACY_FRAGMENT_PPM, help=f"Fragment m/z tolerance in ppm. Default: {LEGACY_FRAGMENT_PPM:g}.")
-    parser.add_argument("--min-intensity", type=float, default=20.0, help="Measured fragment intensity cutoff. Default: 20.")
-    parser.add_argument("--min-fragments", type=int, default=2, help="Minimum number of matched fragments. Default: 2.")
-    parser.add_argument("--min-score", type=float, default=0.35, help="Minimum MS2 match score. Default: 0.35.")
     parser.add_argument("--top-n", type=int, default=3, help="Keep top N candidates per precursor. Default: 3.")
-    parser.add_argument("--backend", choices=("lipidgate", "legacy"), default="lipidgate")
     parser.add_argument("--ms2-library", type=Path, help="Optional validated sphingolipid SQLite index.")
     parser.add_argument("--precursor-ppm", type=float, default=10.)
     parser.add_argument("--fragment-da", type=float, help="Use an absolute MS2 tolerance instead of ppm.")
@@ -58,16 +53,12 @@ def main(argv: list[str] | None = None) -> int:
         raw_ms2_dir=args.input_dir,
         precursor_dir=args.precursor_dir or args.input_dir,
         output_dir=args.output_dir,
-        ms1_library_path=args.ms1_db,
+        ms1_library_path=None,
         file_indices=parse_file_indices(args.files),
         encoding=args.encoding,
         fragment_ppm=args.fragment_ppm,
-        min_fragment_intensity=args.min_intensity,
-        min_matched_fragments=args.min_fragments,
-        min_match_score=args.min_score,
         top_n=args.top_n,
         save_intermediate=args.save_intermediate,
-        backend=args.backend,
         ms2_library_path=args.ms2_library,
         precursor_ppm=args.precursor_ppm,
         fragment_da=args.fragment_da,

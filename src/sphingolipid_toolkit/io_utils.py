@@ -137,11 +137,24 @@ def get_ms1_library_path(config: object) -> Path:
     return Path(_get_required_attr(config, "ms1_library_path", "ms1_db_path"))
 
 
+def protected_library_paths(config: object) -> set[Path]:
+    """Protect selected reference inputs and the bundled scientific assets."""
+    from importlib.resources import files
+    protected=set()
+    for name in ('ms1_library_path','ms1_db_path','ms2_library_path'):
+        selected=getattr(config,name,None)
+        if selected is not None:protected.add(Path(selected).resolve())
+    bundled=Path(str(files('sphingolipid_toolkit').joinpath('data','ms2')))
+    protected.update((bundled/f'sphingolipid_{mode}{suffix}').resolve()
+        for mode in ('positive','negative') for suffix in ('.sqlite','.msp.gz'))
+    return protected
+
+
 def validate_output_paths(config: object, file_indices: Sequence[int]) -> None:
     """Check every batch output before cleanup can overwrite another input."""
 
     paths = [resolve_ms2_input_paths(config, i) for i in file_indices]
-    protected = {get_ms1_library_path(config).resolve()}
+    protected=protected_library_paths(config)
     protected.update(path.resolve() for item in paths for path in (item.text_file, item.target_file))
     output_dir = Path(config.output_dir)
     intermediate = output_dir / config.intermediate_dir_name
@@ -162,7 +175,6 @@ def validate_ms2_file_inputs(config: object, file_index: int) -> tuple[MS2InputP
     paths = resolve_ms2_input_paths(config, file_index)
     require_file(paths.text_file, f"MS/MS txt file for index {file_index}")
     target_df = read_precursor_table(paths.target_file)
-    read_ms1_library(get_ms1_library_path(config))
     validate_output_paths(config, (file_index,))
     ensure_output_dir(getattr(config, "output_dir"))
     return paths, target_df

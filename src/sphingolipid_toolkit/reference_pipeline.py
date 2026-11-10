@@ -6,12 +6,14 @@ from pathlib import Path
 
 import pandas as pd
 
+from .config import validate_matching_parameters
 from .engine import SphingolipidIdentifier, compatible_frame, config_from_workflow
 from .io_utils import parse_ms2_text_to_dataframe, read_precursor_table, write_excel_atomic, require_file
 from .result_writer import write_identifications
 
 
 def run_text_file(config, file_index, logger=None):
+    validate_matching_parameters(config)
     logger = logger or logging.getLogger(__name__)
     text = Path(config.input_dir) / config.text_pattern.format(i=file_index)
     require_file(text,'MS/MS txt file')
@@ -44,6 +46,7 @@ def run_text_file(config, file_index, logger=None):
 
 
 def annotate_targeted_spectrum(spectrum, feature, config, identifier):
+    validate_matching_parameters(config)
     result = identifier.identify(float(spectrum.precursor_mz), list(zip(spectrum.fragment_mz,spectrum.fragment_intensity)),
         scan_id=spectrum.scan_id,rt_minutes=spectrum.ms2_rt,
         polarity=getattr(spectrum,'polarity','+'),precursor_charge=getattr(spectrum,'precursor_charge',None),
@@ -110,6 +113,7 @@ def iter_prepared_mzml(path, min_relative_intensity=0.002):
 
 
 def annotate_targeted_directory(features,config,logger):
+    validate_matching_parameters(config)
     from .targeted_mzml_pipeline import _find_input_files,find_matching_feature
     rows=[]
     with SphingolipidIdentifier(config_from_workflow(config)) as identifier:

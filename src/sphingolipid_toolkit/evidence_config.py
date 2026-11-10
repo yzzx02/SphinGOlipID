@@ -1,4 +1,9 @@
-"""Central author-specified scoring weights and explicit subclass policies."""
+"""Archived experimental schema; never used by current identification.
+
+Retained only to interpret historical tables/configuration. These constants do
+not select, classify, gate or score current candidates; all new identification
+uses engine.py and the attributed reference snapshot.
+"""
 from dataclasses import dataclass
 from math import isfinite
 import re

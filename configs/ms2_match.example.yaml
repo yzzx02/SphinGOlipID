@@ -1,8 +1,9 @@
-# Example SphinGOlipID MS2 matching configuration
+# Current-engine Python configuration example; MS1 workbooks do not seed MS2.
 raw_ms2_dir: ./data/raw_ms2
 precursor_dir: ./data/raw_ms2
 output_dir: ./outputs/ms2_results
-ms1_library_path: ./data/library/MS1_DB_new_3.0.xlsx
+ms1_library_path: null
+ms2_library_path: null
 file_indices: [1, 2, 3, 4, 5, 6]
 text_pattern: hilic-msms-{i}.txt
 target_pattern: hilic-msms-{i}.xlsx
@@ -11,11 +12,8 @@ final_result_name: ms2_annotation_results.xlsx
 log_file_name: run_log.txt
 intermediate_dir_name: intermediate
 encoding: GBK
+precursor_ppm: 10
 fragment_ppm: 20
-min_fragment_intensity: 20
-min_matched_fragments: 2
-min_match_score: 0.35
+min_total_score: 50
 top_n: 3
-enable_rt_validation: true
-enable_deduplication: true
 save_intermediate: false

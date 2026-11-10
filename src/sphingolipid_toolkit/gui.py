@@ -70,12 +70,10 @@ class FileSelection:
 def parse_matching_parameters(values: Mapping[str, str]) -> dict[str, float | int]:
     """Validate user-entered values before creating a backend configuration."""
     parsed: dict[str, float | int] = {}
-    legacy=(('min_fragment_intensity','最低碎片强度',0,1000000,10,float),
-            ('min_matched_fragments','最少匹配碎片数',1,1000,1,int),
-            ('min_match_score','最低匹配得分',0,1,.05,float))
-    schema = ((PARAMETERS[0],*legacy,PARAMETERS[-1])
-              if any(key in values for key,*_ in legacy) else PARAMETERS)
-    for key, label, _low, _high, _step, numeric_type in schema:
+    if any(key in values for key in ('min_fragment_intensity','min_matched_fragments','min_match_score')):
+        from .backend_policy import removed_backend
+        removed_backend()
+    for key,label,_low,_high,_step,numeric_type in PARAMETERS:
         try:
             value = numeric_type(values[key].strip())
         except (KeyError, TypeError, ValueError, OverflowError) as exc:

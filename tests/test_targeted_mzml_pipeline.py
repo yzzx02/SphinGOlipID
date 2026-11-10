@@ -8,9 +8,7 @@ from sphingolipid_toolkit.targeted_mzml_pipeline import (
     TargetedMzMLConfig,
     apply_rt_fit_filter,
     build_ms1_feature_table,
-    finalize_spectrum_matches,
     find_matching_feature,
-    match_observed_to_theoretical,
     read_targetlist_csv,
     search_ms1_candidates,
 )
@@ -41,42 +39,6 @@ def test_read_targetlist_csv_and_build_feature_table(tmp_path):
     assert abs(first["feature_mz"] - 329.3279) < 1e-5
 
 
-def test_match_observed_to_theoretical_and_finalize(tmp_path):
-    spectrum = MS2Spectrum(
-        mzml_file=Path("sample.mzML"),
-        scan_id="scanId=1",
-        precursor_mz=329.3278,
-        ms2_rt=5.04,
-        collision_energy=25.0,
-        fragment_mz=np.array([100.0, 150.0, 200.0]),
-        fragment_intensity=np.array([30.0, 5.0, 40.0]),
-    )
-    theoretical = pd.DataFrame(
-        {
-            "idf": ["frag_a", "frag_b"],
-            "mz": [100.0, 200.0],
-            "anno": ["Cer(d18:1/10:0)", "Cer(d18:1/10:0)"],
-            "total": ["Cer(d28:1)", "Cer(d28:1)"],
-            "target": [329.3278, 329.3278],
-            "lenDB": [2, 2],
-            "RT": [5.039, 5.039],
-            "Abund": [1.0, 1.0],
-        }
-    )
-
-    matched = match_observed_to_theoretical(
-        spectrum,
-        theoretical,
-        fragment_tolerance_fraction=20 / 1_000_000,
-        min_fragment_intensity=20,
-    )
-    result = finalize_spectrum_matches(matched, min_matched_fragments=2, min_match_score=0.35, top_n=3)
-
-    assert len(matched) == 2
-    assert len(result) == 1
-    assert result["注释"].iloc[0] == "Cer(d18:1/10:0)"
-    assert result["匹配度分数"].iloc[0] == 1.0
-    assert result["fragment_error_ppm_max"].iloc[0] == 0.0
 
 
 def test_ppm_filters_for_feature_and_ms1_candidate():

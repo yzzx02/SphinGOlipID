@@ -1,3 +1,4 @@
+"""Archived schema regression only; production rules are tested in reference_engine/."""
 import pytest
 from sphingolipid_toolkit.evidence_config import (
     CLASS_RULES, STRUCTURAL_EVIDENCE_REGISTRY, POOL_WEIGHTS, ClassEvidenceRule,
@@ -52,8 +53,9 @@ def test_registry_can_be_explicitly_extended():
 def test_custom_registry_classification_and_no_common_gate():
     from sphingolipid_toolkit.evidence import classify_fragment
     custom = ClassEvidenceRule("ReviewedAlias",("SM",),True,("HG",),("HG","LCB"),"HG","LCB")
-    record = classify_fragment("ReviewedAlias","[phosphocholine+H]+",registry={"ReviewedAlias":custom})
-    assert record.fragment_type.value == "HG"
+    from sphingolipid_toolkit.backend_policy import RemovedBackendError
+    with pytest.raises(RemovedBackendError):
+        classify_fragment("ReviewedAlias","[phosphocholine+H]+",registry={"ReviewedAlias":custom})
     with pytest.raises(ValueError):
         ClassEvidenceRule("Invalid",(),False,("common",),("common","LCB"),None,None)
     with pytest.raises(ValueError):

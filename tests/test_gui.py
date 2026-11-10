@@ -258,9 +258,6 @@ def test_real_gui_run_processes_spectrum_after_upstream_merge(app, tmp_path, mon
     app.selection = gui.FileSelection(tmp_path / "hilic-msms-1.txt", tmp_path / "hilic-msms-1.xlsx",
                                       config.ms1_library_path, config.output_dir)
     app._refresh_selection_labels()
-    from dataclasses import replace
-    original_build = app._build_config
-    monkeypatch.setattr(app,'_build_config',lambda:replace(original_build(),backend='legacy'))
     app._start_run()
     deadline = time.monotonic() + 10
     while app.running and time.monotonic() < deadline:

@@ -8,10 +8,13 @@ from numbers import Real
 from pathlib import Path
 from typing import Sequence
 
+from .backend_policy import require_current_backend, reject_retired_parameters
+
 
 # Historical workflow defaults intentionally differ; neither is a manuscript
 # final-data assertion. All matching tolerances are supplied through config.
-LEGACY_FRAGMENT_PPM = 20.0
+TEXT_FRAGMENT_PPM = 20.0
+LEGACY_FRAGMENT_PPM = TEXT_FRAGMENT_PPM  # Historical constant name only; no legacy backend.
 TARGETED_FRAGMENT_PPM = 10.0
 
 
@@ -30,25 +33,14 @@ def normalize_file_indices(values: Sequence[int]) -> tuple[int, ...]:
 
 
 def validate_matching_parameters(config: object) -> None:
-    """Reject settings that silently produce empty or invalid annotations."""
-
-    for name, minimum, maximum in (
-        ("fragment_ppm", 0.0, None),
-        ("min_fragment_intensity", 0.0, None),
-        ("min_match_score", 0.0, 1.0),
-    ):
-        value = float(getattr(config, name))
-        if (
-            not isfinite(value)
-            or value < minimum
-            or (name == "fragment_ppm" and value == 0)
-            or (maximum is not None and value > maximum)
-        ):
-            raise ValueError(f"Invalid {name}: {value}")
-    for name in ("top_n", "min_matched_fragments"):
-        value = getattr(config, name)
-        if not isinstance(value, int) or isinstance(value, bool) or value < 1:
-            raise ValueError(f"{name} must be a positive integer")
+    """Validate only current-engine controls; never accept retired score gates."""
+    from .engine import config_from_workflow
+    require_current_backend(getattr(config,'backend','lipidgate'))
+    reject_retired_parameters(config)
+    config_from_workflow(config)
+    value=getattr(config,'feature_rt_tolerance_min',0.5)
+    if not isfinite(value) or value<0:
+        raise ValueError('feature_rt_tolerance_min must be finite and nonnegative')
 
 
 def validate_batch_settings(config: object) -> None:
@@ -94,9 +86,9 @@ class SphinGOlipIDConfig:
     intermediate_dir_name: str = "intermediate"
     encoding: str = "GBK"
     fragment_ppm: float = LEGACY_FRAGMENT_PPM
-    min_fragment_intensity: float = 20.0
-    min_matched_fragments: int = 2
-    min_match_score: float = 0.35
+    min_fragment_intensity: float | None = None
+    min_matched_fragments: int | None = None
+    min_match_score: float | None = None
     top_n: int = 3
     enable_rt_validation: bool = True
     enable_deduplication: bool = True
@@ -113,16 +105,9 @@ class SphinGOlipIDConfig:
         object.__setattr__(self, "precursor_dir", Path(self.precursor_dir))
         if self.ms1_library_path is not None:
             object.__setattr__(self, "ms1_library_path", Path(self.ms1_library_path))
-        elif self.backend == 'legacy':
-            raise ValueError('The legacy backend requires an MS1 library')
         object.__setattr__(self, "output_dir", Path(self.output_dir))
         object.__setattr__(self, "file_indices", normalize_file_indices(self.file_indices))
         validate_batch_settings(self)
-        if self.backend not in {"lipidgate", "legacy"}:
-            raise ValueError("backend must be lipidgate or legacy")
-        if self.backend == "lipidgate":
-            from .engine import config_from_workflow
-            config_from_workflow(self)
 
     @property
     def fragment_tolerance_fraction(self) -> float:
@@ -133,7 +118,7 @@ class SphinGOlipIDConfig:
         cls,
         input_dir: str | Path,
         output_dir: str | Path,
-        ms1_library_path: str | Path,
+        ms1_library_path: str | Path | None = None,
         **kwargs,
     ) -> "SphinGOlipIDConfig":
         """Build a config for the historical one-folder input layout."""
