@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -11,7 +13,7 @@ def points(x, y):
                          "x碳数":x, "归一化保留时间":y})
 
 
-def test_ransac_excludes_outlier_and_final_model_is_new_ols(monkeypatch):
+def test_iols_starts_with_all_points_and_ransac_uses_its_own_consensus(monkeypatch):
     real_ransac = rt.RANSACRegressor
     seeds = []
 
@@ -19,19 +21,22 @@ def test_ransac_excludes_outlier_and_final_model_is_new_ols(monkeypatch):
         def fit(self, x, y, **kwargs):
             super().fit(x,y,**kwargs)
             seeds.append(self)
-            # Canary: only the real RANSAC inlier mask should be consumed.
-            self.estimator_.intercept_ = 1000.
             return self
 
     monkeypatch.setattr(rt,"RANSACRegressor",ObservedSeed)
     data = points([16.,18.,20.,22.,24.,26.], [6.4,7.2,10.5,8.8,9.6,10.4])
     model, stable = rt.iterative_refit(data,"Linear")
+    assert not seeds
+    config = replace(rt.RTIUPConfig(), rt_window_min=.15)
+    consensus_model, consensus = rt._fit_ransac(rt._median_points_by_x(data), "Linear", config)
+    assert seeds[0].residual_threshold == .15
+    assert seeds[0].loss == "absolute_error"
     assert not seeds[0].inlier_mask_[2]
     assert stable["x碳数"].tolist() == [16.,18.,22.,24.,26.]
-    expected = LinearRegression().fit(stable[["x碳数"]].to_numpy(),stable["归一化保留时间"].to_numpy())
-    assert model is not seeds[0].estimator_
-    assert model.coef_ == pytest.approx(expected.coef_)
-    assert model.intercept_ == pytest.approx(expected.intercept_)
+    pd.testing.assert_frame_equal(stable, consensus)
+    assert consensus_model is seeds[0].estimator_
+    assert model.coef_ == pytest.approx(consensus_model.coef_)
+    assert model.intercept_ == pytest.approx(consensus_model.intercept_)
     assert model.coef_[0] == pytest.approx(.4)
 
 
@@ -82,9 +87,9 @@ def test_linear_first_and_fallback(monkeypatch,linear_valid,quadratic_valid,expe
 
 @pytest.mark.parametrize("fit_type", ["Linear","Quadratic"])
 def test_r2_below_point_99_rejected(fit_type):
-    x = np.array([16.,18.,20.,22.,24.])
-    data = points(x,3+.04*(x-16)+np.array([0,.05,-.05,.05,0]))
-    assert rt.iterative_refit(data,fit_type) is not None
+    n = 3 if fit_type == "Linear" else 4
+    x = np.array([16., 18., 20., 22.])[:n]
+    data = points(x, 3 + .04 * (x - 16) + np.array([0, .05, -.05, .05])[:n])
     assert rt._fit_candidate_model(data,fit_type,rt.RTIUPConfig()) is None
 
 
@@ -117,12 +122,47 @@ def test_defaults_and_summary_aliases_preserve_chinese_fields():
     summaries.extend(rt.fit_ecn(data).lines.to_dict("records"))
     summaries.extend(rt.fit_rt_iup(data).lines.to_dict("records"))
     for line in summaries:
-        assert line["fit_strategy"] == "RANSAC-seeded OLS refit"
+        assert line["fit_strategy"] == ("IOLS" if line["拟合成功"] else None)
         for alias, original in {
             "fit_type":"拟合类型","r2":"R²", "representative_point_count":"代表点数",
             "inlier_count":"内点数","x_min":"x最小","x_max":"x最大",
         }.items():
             assert line[alias] == line[original]
+
+
+def test_both_models_recover_original_points_and_compete_on_recovered_count(monkeypatch):
+    # The steeper fit uses four representatives and has perfect R². The gentler
+    # fit uses three and recovers more of the original peaks at duplicate carbons.
+    data = points([16, 18, 20, 22, 24, 16, 16, 18, 18, 20, 20],
+                  [8, 9, 10, 11.3, 12.4, 7.95, 8.05, 8.95, 9.05, 9.95, 10.05])
+    iols = points([16, 18, 20, 22], [8.05, 9.14, 10.22, 11.32])
+    ransac = points([16, 18, 20], [8, 9, 10])
+    seen = []
+
+    def fitted(selection):
+        def fit(reps, fit_type, config):
+            seen.append((fit_type, reps.copy()))
+            x, y = rt._fit_coordinates(selection)
+            return LinearRegression().fit(x, y), selection
+        return fit
+
+    monkeypatch.setattr(rt, "_fit_iols", fitted(iols))
+    monkeypatch.setattr(rt, "_fit_ransac", fitted(ransac))
+    line = rt.fit_line(data)
+    assert len(seen) == 2 and all(degree == "Linear" for degree, _ in seen)
+    pd.testing.assert_frame_equal(seen[0][1], seen[1][1])
+    assert line["fit_strategy"] == "RANSAC"
+    assert line["fit_point_count"] == 3
+    assert line["inlier_count"] == 9
+    narrow = rt.fit_line(data, replace(rt.RTIUPConfig(), rt_window_min=.02))
+    assert narrow["inlier_count"] == 3
+
+
+def test_quadratic_model_cannot_turn_down_inside_fitted_range():
+    # The trend across the full range rises but the derivative at the upper end
+    # is negative. A sparse grid with a step tolerance could accept this model.
+    assert not rt._is_positive_monotonic("Quadratic", [-.1, 4.7, 0], 16, 24)
+    assert rt._is_positive_monotonic("Quadratic", [.1, -3.2, 0], 16, 24)
 
 
 @pytest.mark.parametrize("linear_allowed", [True,False])

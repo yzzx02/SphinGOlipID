@@ -33,19 +33,32 @@ One centroid scores once. HexCer and SHexCer reuse auxiliary support with
 HG/LCB/Other 60/20/20. SHexCer/+O use the strongest HG by default and no LCB
 gate. LacCer/Hex2Cer have the two whole-disaccharide-plus-water HG channels,
 either admitting, strongest HG, 60/20/20. Ordinary Cer Na is total-only with
-mandatory water loss, 60/40. Cer1P H/Na require phosphate loss, 60/40; H uses
-shared d/t chain confirmation, Na reports totals.
+mandatory water loss, 60/40. Cer1P H/Na require phosphate loss. Protonated
+Cer1P and SM use HG/LCB/Other 60/20/20 with composition-specific chain evidence.
+Their sodium adducts use HG/Other 60/40 and report total composition.
+
+For positive GM2 and GM3, combine the curated core Y/Z and B channels into one
+HG gate. Require at least half of the channels for the candidate precursor,
+using distinct observed peaks. Keep chain confirmation separate.
 
 GM1/GD1/GT1/GD3 require two distinct Y/Z HG observations including Y0/Z0,
 two distinct B observations, NeuAc and the existing extended-HexNAc signature
-where required. HG/B/Other stays 50/25/25; HG and B use the strongest physical
-peak. Existing negative and legacy linkage-isomer policies remain separate.
+where required. Score the strongest diagnostic glycan peak in HG and use
+HG/LCB/Other 60/20/20. Preserve the independent glycan admission requirements.
+
+Lyso-SM requires phosphocholine m/z 184.0733. The optional 124.9998 ion
+belongs to HG, base-specific dehydration ions to LCB, and the choline ions
+104.1070 and 86.0964 and precursor dehydration to Other. Hex-IPC, Gb4 and
+doubly ammoniated GD1a/GD1b/GT1b/GQ1b use HG/LCB/Other. Preserve the
+acyl-specific FAH pool for positive SL. Use named CAEP and PG-Cer chains only
+from the curated evidence list, with subclass gates and an independent LCB
+observation. Preserve the sum-composition entries and negative-ion policies.
 
 Current curated chain combinations are authoritative. The historical 85,710
 rows are only a type/name crosswalk; never recreate a full grid to reach that
 count. Positive explicit acyls, including attached acyls, have C>=14 and DB<=3;
 only the exact fifteen marked reference source exceptions are allowed. LCB
-DB<=2 except C18 may DB3; keep m18:3, with no LCB carbon-length filter. Never
+DB<=3 at any carbon length for explicitly curated positive LCBs. Never
 infer acyls from totals. Source-only modifications without distinguishing
 evidence remain explicitly labelled MS1 references, not confirmed MS2 types.
 
@@ -64,8 +77,8 @@ samples, research outputs, caches or builds. Preserve existing unrelated edits.
 
 Local literature checkpoint: `sphingolipid-literature-20261110-r1`, documented
 in `config/scientific_revision_literature_20261110.json`. Keep the attributed
-migration manifest unchanged. The only scientific snapshot deviation is the
-documented DMS extension; do not blindly overwrite it from upstream.
+migration manifest unchanged. The subsequent positive LCB triene revision is
+documented in `config/scientific_revision_lcb_triene_20261115.json`.
 Native DMS coverage is only N,N-dimethylSo(d18:1) [M+H]+. Require at least two
 distinct HG observations among 58.0651/84.0808/110.0964, including 110.0964.
 Use strongest HG, HG/Other 60/40, raw Other >0.5%, no Other/LCB gate or fallback;

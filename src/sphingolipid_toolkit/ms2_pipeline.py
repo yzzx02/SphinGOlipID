@@ -12,7 +12,7 @@ from .backend_policy import removed_backend
 from .config import TEXT_FRAGMENT_PPM, SphinGOlipIDConfig, normalize_file_indices, validate_batch_settings
 from .io_utils import require_file, resolve_ms2_input_paths, validate_output_paths
 from .logging_utils import get_logger, attach_file_handler
-from .result_writer import write_identifications
+from .result_writer import SCAN_ID_DTYPES, write_identifications
 from .scoring import add_standard_score_columns
 
 @dataclass
@@ -109,7 +109,7 @@ def _write_batch_result(result_files:Sequence[Path],final_result_file:Path,logge
     for value in result_files:
         path=Path(value)
         if not path.exists():continue
-        frame=pd.read_excel(path)
+        frame=pd.read_excel(path,dtype=SCAN_ID_DTYPES,keep_default_na=False,na_values=[''])
         if 'evidence_file' in frame:
             frame['evidence_file']=frame['evidence_file'].map(lambda name:
                 os.path.relpath(path.parent/str(name),Path(final_result_file).parent) if pd.notna(name) else name)

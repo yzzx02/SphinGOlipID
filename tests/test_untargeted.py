@@ -38,13 +38,13 @@ def test_da_tolerance_and_no_target_list_are_supported(tmp_path):
         workflow.UntargetedConfig((SOURCE,SOURCE),tmp_path/'result.xlsx')
 
 
-def native_features(path=SOURCE):
+def native_features(path=SOURCE, **overrides):
     return workflow.normalize_xcms_features(pd.DataFrame({
         'xcms_peak_id':['CP1','CP2'],'mz':[538.5225925995]*2,
         'mzmin':[538.5225925995]*2,'mzmax':[538.5225925995]*2,
         'rt':[40.,110.],'rtmin':[32.,102.],'rtmax':[48.,118.],
         'into':[971137.326171875,700000.],'maxo':[100100.,80100.],
-        'sn':[558.,500.]}),path,'+')
+        'sn':[558.,500.], **overrides}),path,'+')
 
 
 def test_native_peak_ids_areas_and_seconds_are_preserved():
@@ -55,6 +55,22 @@ def test_native_peak_ids_areas_and_seconds_are_preserved():
     assert frame.xcms_rt_min.tolist()==pytest.approx([40/60,110/60])
 
 
+@pytest.mark.parametrize('nominal_rt', [30.25, 49.652])
+def test_xcms_nominal_rt_can_fall_outside_the_integration_interval(nominal_rt):
+    frame = native_features(rt=[nominal_rt, 110.])
+    measured = workflow.measure_local_apices(frame, SOURCE, '+').iloc[0]
+    assert measured.xcms_peak_id == 'CP1'
+    assert measured.xcms_rt_min == pytest.approx(nominal_rt / 60)
+    assert (measured.rt_min, measured.rt_max) == pytest.approx((32 / 60, 48 / 60))
+    assert measured.apex_rt_min == pytest.approx(40 / 60)
+    assert measured.peak_area == 971137.326171875
+
+
+def test_reversed_integration_bounds_still_fail_validation():
+    with pytest.raises(ValueError, match='峰边界'):
+        native_features(rtmin=[49., 102.])
+
+
 def test_apices_come_from_actual_local_ms1_not_nominal_xcms_time():
     frame=native_features()
     frame.loc[:,'xcms_rt_min']=[.68,1.84]
@@ -63,6 +79,21 @@ def test_apices_come_from_actual_local_ms1_not_nominal_xcms_time():
     assert measured.apex_intensity.tolist()==pytest.approx([100100.,80100.])
     assert measured.apex_native_scan_id.str.startswith('scan=').all()
     assert measured.peak_area.tolist()==frame.peak_area.tolist()
+
+
+def test_peak_review_recovers_original_scans_and_rejects_a_different_apex():
+    from sphingolipid_toolkit.peak_review import read_peak_scans
+
+    peak = workflow.measure_local_apices(native_features(), SOURCE, "+").iloc[0].copy()
+    peak["native_scan_id"] = "scan=42"
+    trace, (masses, intensities), ms2_rt = read_peak_scans(peak, SOURCE)
+    assert trace[trace[:, 1].argmax()].tolist() == pytest.approx([40 / 60, 100100.0])
+    assert ms2_rt == pytest.approx(0.67)
+    assert masses.tolist() == pytest.approx([264.2686, 282.2791, 538.5199])
+    assert intensities.tolist() == pytest.approx([100., 20., 5.])
+    peak["apex_intensity"] *= 2
+    with pytest.raises(ValueError, match="apex"):
+        read_peak_scans(peak, SOURCE)
 
 
 def spectrum(path=SOURCE,rt=40.2/60):
@@ -163,6 +194,12 @@ def test_empty_detection_exports_a_valid_workbook_without_ms2_only_fallback(tmp_
     path=workflow.run_untargeted(config(tmp_path))
     assert pd.read_excel(path).empty
     assert pd.read_excel(path,sheet_name='features').empty
+    audit = pd.read_excel(path, sheet_name='spectrum_audit')
+    assert len(audit) == 3
+    assert audit.association_status.tolist() == ['no_local_features'] * 3
+    assert audit.passing_candidate_count.tolist() == [0] * 3
+    settings = pd.read_excel(path, sheet_name='parameters').set_index('parameter').value
+    assert settings['engine_revision'] == workflow.ENGINE_REVISION
 
 
 def test_xcms_failure_does_not_replace_existing_output(tmp_path,monkeypatch,detected_features):

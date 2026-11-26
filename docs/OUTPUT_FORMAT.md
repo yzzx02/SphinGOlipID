@@ -1,13 +1,20 @@
 # Output Format
 
-The MS2 backend writes one result Excel file per processed file index and one aggregate result file for the whole batch.
+The TXT command writes one result workbook per processed index and one
+aggregate workbook. Direct mzML writes one identification workbook. Targeted
+mzML writes raw and RT-filtered identifications, the targetlist, and the MS1
+feature table. The desktop and non-targeted CLI write a six-sheet workbook
+documented in the [desktop guide](GUI_GUIDE.md).
 
-Default output file names:
+Result workbooks are written to temporary files and replace the previous
+workbook after a successful write. A failed rerun preserves the previous result;
+use the run status/log to distinguish an old workbook from a new completed run.
+
+Default TXT output file names:
 
 ```text
 ms2_annotation_results.xlsx
 run_log.txt
-intermediate/
 result_msms-1.xlsx
 result_msms-2.xlsx
 ...
@@ -16,7 +23,7 @@ result_msms-6.xlsx
 
 ## Legacy result columns
 
-The converted notebook columns are preserved:
+Compatibility columns for existing review workflows include:
 
 ```text
 注释
@@ -30,12 +37,11 @@ Abund
 碎片
 强度总和
 总分数
-相对强度
 ```
 
 ## Standard alias columns
 
-v0.3 adds stable English aliases for CLI, GUI, tests, and downstream modules:
+The current engine also exports stable English columns:
 
 ```text
 lipid_name
@@ -44,23 +50,20 @@ observed_rt
 signal_intensity
 matched_fragment_count
 matched_intensity_sum
-matched_intensity_ratio
+total_score
 ms2_match_score
 rank
 ```
 
-The aliases are derived from the legacy output and do not change the original scoring logic.
+`total_score` is the current 0–100 score. `ms2_match_score` stores it on a 0–1
+scale for compatibility. `result_rank` and `resolution_level` record the
+engine's ranking and reporting scope. `ms2_evidence_json` retains fragment
+evidence. When it exceeds the Excel cell limit, the row records its digest
+and a reference to an adjacent `ms2-evidence-*.json.gz` file.
 
 ## Intermediate files
 
-When `save_intermediate` / `--keep-intermediate` is enabled, the pipeline keeps files such as:
-
-```text
-actual_ms2_data-{i}.xlsx
-DB_sheet-{i}.xlsx
-Isomer.xlsx
-out_DB.csv
-out-query.csv
-```
-
-When disabled, temporary `Isomer.xlsx`, `out_DB.csv`, and `out-query.csv` are removed after each file.
+For TXT, `--keep-intermediate` retains `intermediate/parsed_ms2-{i}.csv` with
+the parsed scan IDs, precursor m/z, RT and measured fragments. For non-targeted
+mzML, `--save-intermediate` or the desktop **保留 XCMS 峰表** option retains
+per-file centWave outputs beside the workbook.

@@ -15,54 +15,53 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from .gui_theme import ALTERNATE, INK, PANEL, SELECTION, UI_FONT, WARNING, configure_desktop_style
 from .untargeted import UntargetedConfig, run_untargeted
-from .result_writer import copy_identification_bundle
+from .result_writer import SCAN_ID_DTYPES, copy_identification_bundle
 from .scoring import add_standard_score_columns
 
 
 APP_TITLE = "SphinGOlipID · 非靶向鞘脂鉴定"
-BACKGROUND = "#f3f6fb"
-INK = "#182b46"
-MUTED = "#64748b"
-ACCENT = "#2563eb"
+RESULT_PAGE_SIZE = 500
 
 # Field, label, spinner bounds, increment, numeric type.
 PARAMETERS = (
     ("fragment_ppm", "碎片容差 (ppm)", 0.1, 1000, 1, float),
     ("precursor_ppm", "MS1 容差 (ppm)", 0.1, 1000, 1, float),
     ("min_total_score", "最低总分 (0–100)", 0, 100, 1, float),
-    ("top_n", "每个前体保留 Top-N", 1, 1000, 1, int),
+    ("top_n", "每个峰保留 Top-N", 1, 1000, 1, int),
     ("peakwidth_min", "最小峰宽 (秒)", 0.1, 1000, 1, float),
     ("peakwidth_max", "最大峰宽 (秒)", 0.1, 1000, 1, float),
     ("noise", "噪声阈值 (强度)", 0, 1000000000, 100, float),
     ("snthresh", "信噪比 (S/N)", 0.1, 10000, 1, float),
 )
-NAME_COLUMNS = ("lipid_name", "注释", "name", "annotation", "Lipid")
-SCORE_COLUMNS = ("total_score", "ms2_match_score", "匹配度分数")
+NAME_COLUMNS = ("lipid_name", "matched_name", "注释", "name", "annotation", "Lipid")
+SCORE_COLUMNS = ("total_score", "总分数", "ms2_match_score", "匹配度分数")
+FRACTIONAL_SCORE_COLUMNS = {"ms2_match_score", "匹配度分数"}
 RESULT_FIELDS = (
-    (("lipid_name", "注释", "name", "annotation"), "脂质名称", 240),
-    (("observed_mz", "target"), "前体 m/z", 110),
-    (("apex_rt_min",), "峰顶 RT (min)", 130),
-    (("observed_rt", "RT"), "保留时间 (min)", 130),
-    (("total_score", "ms2_match_score", "匹配度分数"), "MS2 总分 (0–100)", 150),
+    (NAME_COLUMNS, "脂质名称", 240),
+    (("adduct",), "加合离子", 100),
+    (("observed_mz", "target"), "前体 m/z", 100),
+    (("apex_rt_min",), "峰顶 RT (min)", 115),
+    (("total_score", "ms2_match_score", "匹配度分数"), "MS2 总分 (0–100)", 145),
+    (("matched_fragment_count",), "匹配碎片数", 100),
+    (("resolution_level",), "报告层级", 125),
+    (("observed_rt", "RT"), "MS2 RT (min)", 120),
     (("rank",), "候选排名", 90),
-    (("matched_fragment_count",), "匹配碎片数", 110),
-    (("signal_intensity", "Abund"), "信号强度", 120),
+    (("peak_area",), "峰面积", 125),
+    (("apex_intensity", "signal_intensity", "Abund"), "峰顶强度", 120),
     (("xcms_peak_id",), "XCMS 峰编号", 120),
     (("source_file", "source_result_file"), "来源文件", 180),
 )
+TABLE_DECIMALS = {"observed_mz": 5, "target": 5, "feature_mz": 5, "precursor_mz": 5,
+                  "apex_rt_min": 3, "observed_rt": 3, "RT": 3, "ms2_rt_min": 3}
+NUMERIC_RESULT_COLUMNS = {*TABLE_DECIMALS, *SCORE_COLUMNS, "rank", "matched_fragment_count", "peak_area",
+                          "apex_intensity", "signal_intensity", "Abund", "passing_candidate_count"}
 STAGES = (
     ("Detecting MS1 peaks", "XCMS 提取 MS1 色谱峰"),
     ("Measuring MS1 peak apices", "测量实际峰顶与峰强度"),
     ("Matching acquired MS2", "关联 MS2 并鉴定鞘脂"),
-    ("Loading MS1", "加载 MS1 数据库"),
     ("Validating inputs", "校验输入文件"),
-    ("Reading MS2", "读取原始 MS/MS 数据"),
-    ("Extracting precursor", "提取前体离子谱图"),
-    ("Searching MS1", "检索 MS1 候选"),
-    ("Matching precursor candidates", "匹配前体离子候选"),
-    ("Generating theoretical", "生成理论碎片"),
-    ("Matching precursor fragment", "匹配 MS2 碎片"),
     ("Exporting results", "写入注释结果"),
 )
 
@@ -85,7 +84,7 @@ def parse_matching_parameters(values: Mapping[str, str]) -> dict[str, float | in
         except (KeyError, TypeError, ValueError, OverflowError) as exc:
             unit = "整数" if numeric_type is int else "数值"
             raise ValueError(f"{label}须填写有效的{unit}。") from exc
-        if not math.isfinite(value):
+        if numeric_type is float and not math.isfinite(value):
             raise ValueError(f"{label}须填写有限数值。")
         if key in {"fragment_ppm", "precursor_ppm"} and value <= 0:
             raise ValueError("匹配容差须大于 0。")
@@ -93,12 +92,8 @@ def parse_matching_parameters(values: Mapping[str, str]) -> dict[str, float | in
             raise ValueError(f"{label}须大于零。")
         if key == "noise" and value < 0:
             raise ValueError("噪声阈值不能为负数。")
-        if key == "min_fragment_intensity" and value < 0:
-            raise ValueError("最低碎片强度不能为负数。")
-        if key in {"min_matched_fragments", "top_n"} and value < 1:
+        if key == "top_n" and value < 1:
             raise ValueError(f"{label}须为不小于 1 的整数。")
-        if key == "min_match_score" and not 0 <= value <= 1:
-            raise ValueError("最低匹配得分须在 0 到 1 之间。")
         if key == 'min_total_score' and not 0 <= value <= 100:
             raise ValueError('最低总分须在 0 到 100 之间。')
         parsed[key] = value
@@ -129,14 +124,14 @@ def filter_result_rows(
         if column is None:
             raise ValueError("当前结果没有 MS2 得分列，无法按得分筛选。")
         scores = pd.to_numeric(view[column], errors="coerce")
-        if column != "total_score":
+        if column in FRACTIONAL_SCORE_COLUMNS:
             scores = scores * 100
         view = view.loc[scores >= min_score]
     if sort_column in view.columns:
         values = view[sort_column]
         nonempty = values.notna() & values.astype(str).str.strip().ne("")
         numeric = pd.to_numeric(values, errors="coerce")
-        sort_values = numeric if numeric.loc[nonempty].notna().all() else (
+        sort_values = numeric if sort_column in NUMERIC_RESULT_COLUMNS or numeric.loc[nonempty].notna().all() else (
             values.astype("string").str.casefold().where(nonempty)
         )
         ordered = sort_values.sort_values(
@@ -164,7 +159,6 @@ class SphinGOlipIDApp:
         self.root.title(APP_TITLE)
         self.root.geometry("1180x720")
         self.root.minsize(1000, 640)
-        self.root.configure(bg=BACKGROUND)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.selection = FileSelection()
@@ -172,7 +166,11 @@ class SphinGOlipIDApp:
         self.running = False
         self.closed = False
         self.current_result: Path | None = None
+        self.result_has_annotation_report = False
+        self.result_sheet: str | None = None
         self.result_df = pd.DataFrame()
+        self.filtered_results = pd.DataFrame()
+        self.result_page = 0
         self.result_columns: list[str] = []
         self.column_titles: dict[str, str] = {}
         self.column_widths: dict[str, int] = {}
@@ -197,12 +195,14 @@ class SphinGOlipIDApp:
         self.setup_status = tk.StringVar(value="请选择 mzML 文件与输出 XLSX；默认 XCMS，无需目标表。")
         self.run_status = tk.StringVar(value="准备就绪 · 选择文件后开始解析，或打开已有结果。")
         self.result_path = tk.StringVar(value="尚未打开结果文件")
+        self.result_sheet_var = tk.StringVar()
         self.result_summary = tk.StringVar(value="尚未加载结果")
+        self.result_page_label = tk.StringVar()
         self.search_var = tk.StringVar()
         self.score_filter_var = tk.StringVar()
         self.filter_message = tk.StringVar()
 
-        self._configure_styles()
+        configure_desktop_style(self.root)
         self._load_images()
         self._build_shell()
         self._build_setup()
@@ -217,45 +217,12 @@ class SphinGOlipIDApp:
     def asset_dir(self) -> Path:
         return Path(__file__).with_name("gui_assets")
 
-    def _configure_styles(self) -> None:
-        style = ttk.Style(self.root)
-        style.theme_use("clam")
-        style.configure(".", font=("Microsoft YaHei UI", 10))
-        style.configure("TFrame", background=BACKGROUND)
-        style.configure("TLabel", background=BACKGROUND, foreground=INK)
-        style.configure("Muted.TLabel", foreground=MUTED)
-        style.configure("Heading.TLabel", font=("Microsoft YaHei UI", 18, "bold"))
-        style.configure("Section.TLabel", font=("Microsoft YaHei UI", 13, "bold"))
-        style.configure("Card.TLabelframe", background="white", bordercolor="#dce4ef", relief="solid")
-        style.configure("Card.TLabelframe.Label", background=BACKGROUND, foreground=INK,
-                        font=("Microsoft YaHei UI", 11, "bold"))
-        style.configure("Card.TLabel", background="white", foreground=INK)
-        style.configure("TButton", padding=(12, 6), background="white", foreground=INK,
-                        bordercolor="#d5dfed", focusthickness=1, focuscolor=ACCENT)
-        style.map("TButton", background=[("active", "#eaf1ff")], foreground=[("disabled", "#94a3b8")])
-        style.configure("Primary.TButton", background=ACCENT, foreground="white", bordercolor=ACCENT)
-        style.map("Primary.TButton", background=[("disabled", "#c6d5ee"), ("active", "#1d4ed8")],
-                  foreground=[("disabled", "#64748b"), ("!disabled", "white")])
-        style.configure("TEntry", padding=5, fieldbackground="white")
-        style.configure("TSpinbox", padding=5, fieldbackground="white", arrowsize=14)
-        style.configure("TCheckbutton", background="white", foreground=INK)
-        style.configure("TNotebook", background=BACKGROUND, borderwidth=0)
-        style.configure("TNotebook.Tab", padding=(22, 10), background="#e6edf7", foreground=MUTED)
-        style.map("TNotebook.Tab", background=[("selected", "white")], foreground=[("selected", ACCENT)],
-                  padding=[("selected", (22, 10)), ("!selected", (22, 10))])
-        style.configure("Treeview", background="white", fieldbackground="white", foreground=INK,
-                        rowheight=30, bordercolor="#dce4ef")
-        style.configure("Treeview.Heading", background="#edf2fa", foreground=INK,
-                        padding=(8, 8), font=("Microsoft YaHei UI", 10, "bold"))
-        style.map("Treeview", background=[("selected", "#dbeafe")], foreground=[("selected", INK)])
-        style.configure("Horizontal.TProgressbar", background=ACCENT, troughcolor="#e2e8f0")
-
     def _load_images(self) -> None:
         for name in ("ICO_PC.png", "Image2.png"):
             try:
                 image = tk.PhotoImage(file=str(self.asset_dir / name))
                 if name == "Image2.png":
-                    scale = max(1, math.ceil(max(image.width(), image.height()) / 44))
+                    scale = max(1, math.ceil(max(image.width(), image.height()) / 30))
                     image = image.subsample(scale, scale)
                 self.images[name] = image
             except tk.TclError:
@@ -264,26 +231,27 @@ class SphinGOlipIDApp:
             self.root.iconphoto(True, self.images["ICO_PC.png"])
 
     def _build_shell(self) -> None:
-        header = ttk.Frame(self.root, padding=(24, 16, 24, 10))
+        header = ttk.Frame(self.root, padding=(12, 7, 12, 7))
         header.pack(fill=tk.X)
         if "Image2.png" in self.images:
-            ttk.Label(header, image=self.images["Image2.png"]).pack(side=tk.LEFT, padx=(0, 14))
+            ttk.Label(header, image=self.images["Image2.png"]).pack(side=tk.LEFT, padx=(0, 8))
         titles = ttk.Frame(header)
         titles.pack(side=tk.LEFT)
         ttk.Label(titles, text="SphinGOlipID", style="Heading.TLabel").pack(anchor="w")
         ttk.Label(titles, text="mzML 非靶向峰提取与鞘脂鉴定", style="Muted.TLabel").pack(anchor="w")
         ttk.Label(header, text="mzML 导入  →  XCMS 峰提取  →  鞘脂鉴定", style="Muted.TLabel").pack(side=tk.RIGHT)
 
-        footer = ttk.Frame(self.root, padding=(24, 9))
+        footer = ttk.Frame(self.root, padding=(12, 4))
         footer.pack(side=tk.BOTTOM, fill=tk.X)
+        ttk.Separator(self.root, orient=tk.HORIZONTAL).pack(side=tk.BOTTOM, fill=tk.X)
         self.progress = ttk.Progressbar(footer, mode="determinate", length=160)
         self.progress.pack(side=tk.RIGHT, padx=(16, 0))
         ttk.Label(footer, textvariable=self.run_status, style="Muted.TLabel").pack(side=tk.LEFT)
 
         self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=24, pady=(4, 0))
-        self.setup_page = ttk.Frame(self.notebook, padding=(16, 12))
-        self.results_page = ttk.Frame(self.notebook, padding=16)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=(2, 5))
+        self.setup_page = ttk.Frame(self.notebook, padding=(11, 8))
+        self.results_page = ttk.Frame(self.notebook, padding=10)
         self.notebook.add(self.setup_page, text="解析设置")
         self.notebook.add(self.results_page, text="MS2 注释结果")
 
@@ -291,7 +259,7 @@ class SphinGOlipIDApp:
         self.setup_page.columnconfigure(0, weight=1)
         self.setup_page.rowconfigure(4, weight=1)
         inputs = ttk.LabelFrame(self.setup_page, text=" 1 · mzML 文件与结果输出 ",
-                                style="Card.TLabelframe", padding=(16, 6))
+                                style="Panel.TLabelframe", padding=(10, 5))
         inputs.grid(row=0, column=0, sticky="ew")
         inputs.columnconfigure(1, weight=1)
         rows = (
@@ -299,51 +267,55 @@ class SphinGOlipIDApp:
             ("输出结果 (.xlsx)", "output_file", self._choose_output_file),
         )
         for row, (label, key, command) in enumerate(rows):
-            ttk.Label(inputs, text=label, style="Card.TLabel").grid(row=row, column=0, sticky="w", padx=(0, 18), pady=3)
+            ttk.Label(inputs, text=label, style="Panel.TLabel").grid(row=row, column=0, sticky="w", padx=(0, 12), pady=3)
             ttk.Entry(inputs, textvariable=self.path_vars[key], state="readonly").grid(row=row, column=1, sticky="ew", pady=3)
             button = ttk.Button(inputs, text="保存位置" if key == "output_file" else "选择文件",
                                 command=command, width=10)
-            button.grid(row=row, column=2, padx=(12, 0), pady=3)
+            button.grid(row=row, column=2, padx=(8, 0), pady=3)
             self.input_controls.append(button)
 
         parameters = ttk.LabelFrame(self.setup_page, text=" 2 · 鉴定参数与 XCMS 峰提取 ",
-                                    style="Card.TLabelframe", padding=(16, 6))
-        parameters.grid(row=1, column=0, sticky="ew", pady=(16, 0))
+                                    style="Panel.TLabelframe", padding=(10, 5))
+        parameters.grid(row=1, column=0, sticky="ew", pady=(10, 0))
         for position, (key, label, low, high, step, _numeric_type) in enumerate(PARAMETERS):
             column, label_row = position % 4, (position // 4) * 2
             parameters.columnconfigure(column, weight=1, uniform="parameter")
             if key == "fragment_ppm":
-                heading = ttk.Frame(parameters)
-                heading.grid(row=label_row, column=column, sticky="w", padx=6, pady=(0, 5))
-                ttk.Label(heading, text="碎片容差", style="Card.TLabel").pack(side=tk.LEFT)
+                heading = ttk.Frame(parameters, style="Panel.TFrame")
+                heading.grid(row=label_row, column=column, sticky="w", padx=6, pady=(0, 3))
+                ttk.Label(heading, text="碎片容差", style="Panel.TLabel").pack(side=tk.LEFT)
                 unit = ttk.Combobox(heading, textvariable=self.fragment_unit, values=("ppm", "Da"), width=5, state="readonly")
                 unit.pack(side=tk.LEFT, padx=(6, 0))
                 self.input_controls.append(unit)
             else:
-                ttk.Label(parameters, text=label, style="Card.TLabel").grid(row=label_row, column=column, sticky="w", padx=6, pady=(8 if label_row else 0, 5))
+                ttk.Label(parameters, text=label, style="Panel.TLabel").grid(
+                    row=label_row, column=column, sticky="w", padx=6, pady=(6 if label_row else 0, 3))
             spinner = ttk.Spinbox(parameters, textvariable=self.parameter_vars[key],
                                   from_=low, to=high, increment=step, width=10)
             spinner.grid(row=label_row + 1, column=column, sticky="ew", padx=6)
             self.input_controls.append(spinner)
             if key == "fragment_ppm":
                 self.fragment_spinner = spinner
-        check = ttk.Checkbutton(parameters, text="保留 XCMS 峰表", variable=self.save_intermediate)
+        check = ttk.Checkbutton(parameters, text="保留 XCMS 峰表", variable=self.save_intermediate,
+                                style="Panel.TCheckbutton")
         check.grid(row=4, column=0, sticky="w", padx=6, pady=(6, 0))
         self.input_controls.append(check)
         mode = ttk.Combobox(parameters, textvariable=self.polarity_var, values=("正模式", "负模式"), width=10, state="readonly")
         mode.grid(row=4, column=1, sticky="w", padx=6, pady=(6, 0))
         self.input_controls.append(mode)
-        ttk.Label(parameters, text="MS1：XCMS centWave", style="Card.TLabel").grid(row=4, column=2, sticky="w", padx=6, pady=(6, 0))
+        weights = ttk.Button(parameters, text="鞘脂评分权重…", command=self._edit_acidic_weights)
+        weights.grid(row=4, column=2, sticky="w", padx=6, pady=(6, 0))
+        self.input_controls.append(weights)
         reset = ttk.Button(parameters, text="恢复默认参数", command=self._reset_parameters)
         reset.grid(row=4, column=3, sticky="e", padx=6, pady=(6, 0))
         self.input_controls.append(reset)
 
         actions = ttk.Frame(self.setup_page)
-        actions.grid(row=2, column=0, sticky="ew", pady=(10, 0))
+        actions.grid(row=2, column=0, sticky="ew", pady=(8, 0))
         self.run_button = ttk.Button(actions, text="开始解析", command=self._start_run, style="Primary.TButton")
         self.run_button.pack(side=tk.LEFT)
         self.setup_open_button = ttk.Button(actions, text="打开已有结果", command=self._choose_result_file)
-        self.setup_open_button.pack(side=tk.LEFT, padx=12)
+        self.setup_open_button.pack(side=tk.LEFT, padx=8)
         ttk.Label(actions, textvariable=self.setup_status, style="Muted.TLabel").pack(side=tk.LEFT, padx=8)
 
         ttk.Label(self.setup_page, text="输入：含 MS1/MS2 的质心化 mzML，无需目标表。峰宽单位为秒；结果包含鉴定、峰面积与完整 MS2 证据。",
@@ -358,31 +330,52 @@ class SphinGOlipIDApp:
         self.export_button.pack(side=tk.RIGHT)
         self.results_open_button = ttk.Button(top, text="打开结果文件", command=self._choose_result_file)
         self.results_open_button.pack(side=tk.RIGHT, padx=10)
-        ttk.Entry(page, textvariable=self.result_path, state="readonly").pack(fill=tk.X, pady=(12, 10))
+        self.ecn_button = ttk.Button(top, text="ECN 复核与导出", command=self._open_ecn_report, state=tk.DISABLED)
+        self.ecn_button.pack(side=tk.RIGHT)
+        self.peak_button = ttk.Button(top, text="查看峰图与质谱", command=self._open_peak_review,
+                                      state=tk.DISABLED, style="Primary.TButton")
+        self.peak_button.pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Entry(page, textvariable=self.result_path, state="readonly").pack(fill=tk.X, pady=(8, 6))
 
         filters = ttk.Frame(page)
         filters.pack(fill=tk.X)
-        ttk.Label(filters, text="脂质名称").pack(side=tk.LEFT)
-        self.search_entry = ttk.Entry(filters, textvariable=self.search_var, width=25)
-        self.search_entry.pack(side=tk.LEFT, padx=(8, 18))
+        ttk.Label(filters, text="工作表").pack(side=tk.LEFT)
+        self.result_sheet_picker = ttk.Combobox(filters, textvariable=self.result_sheet_var, width=17, state="disabled")
+        self.result_sheet_picker.pack(side=tk.LEFT, padx=(6, 12))
+        self.result_sheet_picker.bind("<<ComboboxSelected>>", self._change_result_sheet)
+        ttk.Label(filters, text="搜索").pack(side=tk.LEFT)
+        self.search_entry = ttk.Entry(filters, textvariable=self.search_var, width=18)
+        self.search_entry.pack(side=tk.LEFT, padx=(6, 12))
         ttk.Label(filters, text="最低总分 (0–100)").pack(side=tk.LEFT)
         self.score_filter_entry = ttk.Spinbox(filters, textvariable=self.score_filter_var,
                                              from_=0, to=100, increment=5, width=7, state="disabled")
         self.score_filter_entry.pack(side=tk.LEFT, padx=8)
         ttk.Button(filters, text="重置筛选", command=self._reset_filters).pack(side=tk.LEFT, padx=8)
-        ttk.Label(filters, textvariable=self.result_summary, style="Muted.TLabel").pack(side=tk.RIGHT)
-        ttk.Label(page, textvariable=self.filter_message, style="Muted.TLabel").pack(anchor="w", pady=(5, 6))
+
+        pagination = ttk.Frame(page)
+        pagination.pack(side=tk.BOTTOM, fill=tk.X, pady=(6, 0))
+        ttk.Label(pagination, textvariable=self.result_summary, style="Muted.TLabel").pack(side=tk.LEFT)
+        ttk.Label(pagination, textvariable=self.filter_message, style="Muted.TLabel").pack(side=tk.LEFT, padx=8)
+        self.next_result_page = ttk.Button(pagination, text="下一页", command=lambda: self._change_result_page(1), state=tk.DISABLED)
+        self.next_result_page.pack(side=tk.RIGHT)
+        ttk.Label(pagination, textvariable=self.result_page_label, style="Muted.TLabel").pack(side=tk.RIGHT, padx=8)
+        self.previous_result_page = ttk.Button(pagination, text="上一页", command=lambda: self._change_result_page(-1), state=tk.DISABLED)
+        self.previous_result_page.pack(side=tk.RIGHT)
 
         panes = ttk.Panedwindow(page, orient=tk.HORIZONTAL)
-        panes.pack(fill=tk.BOTH, expand=True)
-        table_frame = ttk.Frame(panes)
-        sidebar = ttk.Frame(panes, width=270)
+        panes.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
+        table_frame = ttk.Frame(panes, width=620)
+        sidebar = ttk.Frame(panes, width=285)
+        # Wide sheets should scroll within the table instead of pushing the
+        # details and log pane out of view when a different sheet is loaded.
+        table_frame.grid_propagate(False)
+        sidebar.grid_propagate(False)
         panes.add(table_frame, weight=4)
         panes.add(sidebar, weight=1)
         table_frame.rowconfigure(0, weight=1)
         table_frame.columnconfigure(0, weight=1)
         self.result_tree = ttk.Treeview(table_frame, show="headings", selectmode="browse")
-        self.result_tree.tag_configure("alternate", background="#f6f9fe")
+        self.result_tree.tag_configure("alternate", background=ALTERNATE)
         y_scroll = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.result_tree.yview)
         x_scroll = ttk.Scrollbar(table_frame, orient=tk.HORIZONTAL, command=self.result_tree.xview)
         self.result_tree.configure(yscrollcommand=y_scroll.set, xscrollcommand=x_scroll.set)
@@ -390,11 +383,11 @@ class SphinGOlipIDApp:
         y_scroll.grid(row=0, column=1, sticky="ns")
         x_scroll.grid(row=1, column=0, sticky="ew")
         self.result_tree.bind("<<TreeviewSelect>>", self._on_result_select)
-        self.empty_panel = ttk.Frame(table_frame, padding=22)
-        self.empty_title = ttk.Label(self.empty_panel, text="尚未加载注释结果", style="Section.TLabel")
+        self.empty_panel = ttk.Frame(table_frame, style="Panel.TFrame", padding=16)
+        self.empty_title = ttk.Label(self.empty_panel, text="尚未加载注释结果", style="Section.TLabel", background=PANEL)
         self.empty_title.pack(pady=(0, 8))
         self.empty_hint = ttk.Label(self.empty_panel, text="完成解析后将在这里显示结果，\n也可以打开已有的 XLSX 结果文件。",
-                                    style="Muted.TLabel", justify=tk.CENTER)
+                                    style="Muted.TLabel", background=PANEL, justify=tk.CENTER)
         self.empty_hint.pack()
         self.empty_panel.place(relx=0.5, rely=0.45, anchor="center")
 
@@ -403,14 +396,17 @@ class SphinGOlipIDApp:
         sidebar.rowconfigure(1, weight=2)
         self.detail_text = self._text_panel(sidebar, " 所选候选详情 ", row=0, height=9)
         self.log_text = self._text_panel(sidebar, " 运行日志 ", row=1, height=7)
+        self.log_text.tag_configure("warning", foreground=WARNING)
         self._set_detail("点击表格中的候选行，查看完整注释字段。")
 
     @staticmethod
     def _text_panel(parent: ttk.Frame, title: str, row: int, height: int) -> tk.Text:
-        panel = ttk.LabelFrame(parent, text=title, style="Card.TLabelframe", padding=8)
-        panel.grid(row=row, column=0, sticky="nsew", padx=(12, 0), pady=(0 if row == 0 else 12, 0))
-        text = tk.Text(panel, width=26, height=height, bg="white", fg=INK, relief=tk.FLAT,
-                       wrap=tk.WORD, font=("Microsoft YaHei UI", 9), state=tk.DISABLED)
+        panel = ttk.LabelFrame(parent, text=title, style="Panel.TLabelframe", padding=(6, 4))
+        panel.grid(row=row, column=0, sticky="nsew", padx=(5, 0), pady=(0 if row == 0 else 8, 0))
+        text = tk.Text(panel, width=26, height=height, bg=PANEL, fg=INK, relief=tk.FLAT,
+                       highlightthickness=0, borderwidth=0, padx=3, pady=2,
+                       selectbackground=SELECTION, selectforeground=INK,
+                       wrap=tk.WORD, font=UI_FONT, state=tk.DISABLED)
         scroll = ttk.Scrollbar(panel, orient=tk.VERTICAL, command=text.yview)
         text.configure(yscrollcommand=scroll.set)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
@@ -482,6 +478,7 @@ class SphinGOlipIDApp:
         for key, variable in self.parameter_vars.items():
             variable.set(str(UntargetedConfig.__dataclass_fields__[key].default))
         self.save_intermediate.set(False)
+        self.acidic_weights = {}
         self._fragment_tolerances = {"ppm": str(UntargetedConfig.__dataclass_fields__["fragment_ppm"].default), "Da": "0.3"}
         self.polarity_var.set("正模式")
 
@@ -518,8 +515,84 @@ class SphinGOlipIDApp:
             output_file=self.selection.output_file,
             polarity=modes[self.polarity_var.get()],
             save_intermediate=self.save_intermediate.get(),
+            acidic_weights=dict(getattr(self, 'acidic_weights', {})),
             **parameters,
         )
+
+    def _edit_acidic_weights(self) -> None:
+        from .acidic_scoring import SCORING_PROFILES, normalize_acidic_weights
+
+        dialog = tk.Toplevel(self.setup_page)
+        dialog.title('鞘脂评分权重')
+        dialog.transient(self.setup_page.winfo_toplevel())
+        panel = ttk.Frame(dialog, padding=12)
+        panel.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(panel, text='设置正离子鞘脂各证据池的相对权重，运行时换算为 100%。').pack(anchor='w')
+        ttk.Label(panel, text='三池默认 60 / 20 / 20，两池默认 60 / 40。诊断准入单独判定。',
+                  style="Muted.TLabel").pack(anchor='w', pady=(3, 9))
+        profiles = dict(getattr(self, 'acidic_weights', {}))
+        lipid = tk.StringVar(value='GM3')
+        display = {'LSM': 'Lyso-SM', 'SM': 'SM [M+H]+', 'Cer1P': 'Cer1P [M+H]+',
+                   'CAEP': 'CAEP (sum composition)', 'PG-Cer': 'PG-Cer (sum composition)'}
+        profile_keys = {display.get(key, key): key for key in SCORING_PROFILES}
+        selection = ttk.Combobox(panel, textvariable=lipid, values=tuple(sorted(profile_keys)), state='readonly', width=27)
+        selection.pack(anchor='w')
+        fields = ttk.Frame(panel)
+        fields.pack(fill=tk.X, pady=10)
+        labels = {'hg': 'HG', 'lcb': 'LCB', 'fah': 'FAH', 'other': 'Other'}
+        values = []
+        shown = 'GM3'
+        error = tk.StringVar()
+        ttk.Label(panel, textvariable=error, style="Warning.TLabel").pack(anchor='w')
+
+        def render():
+            for widget in fields.winfo_children():
+                widget.destroy()
+            values.clear()
+            pools, defaults = SCORING_PROFILES[shown]
+            for column, (pool, value) in enumerate(zip(pools, profiles.get(shown, defaults))):
+                ttk.Label(fields, text=labels[pool]).grid(row=0, column=column, sticky='w', padx=(0, 12))
+                var = tk.StringVar(value=f'{value:.12g}')
+                ttk.Entry(fields, textvariable=var, width=10).grid(row=1, column=column, padx=(0, 12))
+                values.append(var)
+
+        def store():
+            try:
+                normalized = normalize_acidic_weights({shown: tuple(var.get() for var in values)})
+            except ValueError:
+                error.set('请填写非负有限数字，至少一项大于零。')
+                return False
+            profiles.pop(shown, None)
+            profiles.update(normalized)
+            error.set('')
+            return True
+
+        def switch(_event):
+            nonlocal shown
+            if store():
+                shown = profile_keys[lipid.get()]
+                render()
+            else:
+                lipid.set(display.get(shown, shown))
+
+        def reset_profile():
+            profiles.pop(shown, None)
+            error.set('')
+            render()
+
+        def save():
+            if store():
+                self.acidic_weights = profiles
+                dialog.destroy()
+
+        selection.bind('<<ComboboxSelected>>', switch)
+        buttons = ttk.Frame(panel)
+        buttons.pack(fill=tk.X)
+        ttk.Button(buttons, text='恢复本类别默认值', command=reset_profile).pack(side=tk.LEFT)
+        ttk.Button(buttons, text='应用', command=save, style="Primary.TButton").pack(side=tk.RIGHT)
+        ttk.Button(buttons, text='取消', command=dialog.destroy).pack(side=tk.RIGHT, padx=8)
+        render()
+        dialog.grab_set()
 
     def _start_run(self) -> None:
         if self.running:
@@ -532,19 +605,16 @@ class SphinGOlipIDApp:
         self.running = True
         self.run_started = monotonic()
         self.run_stage = "准备解析"
-        self.current_result = None
         self._set_running_ui()
-        self.score_filter_entry.configure(state=tk.DISABLED)
         self.progress.configure(mode="indeterminate")
         self.progress.start(12)
         self._replace_text(self.log_text, "")
-        self.result_df = pd.DataFrame()
-        self.result_columns = []
-        self.result_path.set("正在生成新的 MS2 注释结果…")
-        self._reset_filters()
-        self.empty_title.configure(text="正在进行 MS2 匹配")
-        self.empty_hint.configure(text="处理完成后自动显示注释结果。\n当前阶段与耗时显示在窗口底部。")
-        self._set_detail("正在解析，完成后可选择候选查看详情。")
+        if self.current_result is None:
+            self.result_path.set("正在生成新的 MS2 注释结果…")
+            self.empty_title.configure(text="正在进行 MS2 匹配")
+            self.empty_hint.configure(text="处理完成后自动显示注释结果。\n当前阶段与耗时显示在窗口底部。")
+        else:
+            self.result_path.set(f"正在鉴定 · 显示上次打开的结果：{self.current_result}")
         self.show_results()
         self._append_log("开始解析。")
         try:
@@ -575,6 +645,9 @@ class SphinGOlipIDApp:
         self.setup_open_button.configure(state=state)
         self.results_open_button.configure(state=state)
         self.export_button.configure(state=tk.NORMAL if self.current_result and not self.running else tk.DISABLED)
+        self.ecn_button.configure(state=tk.NORMAL if self.result_has_annotation_report and not self.running else tk.DISABLED)
+        self.result_sheet_picker.configure(state="readonly" if self.current_result and not self.running else tk.DISABLED)
+        self.score_filter_entry.configure(state=tk.NORMAL if any(col in self.result_df for col in SCORE_COLUMNS) else tk.DISABLED)
         self.run_button.configure(text="解析中…" if self.running else "开始解析")
         self._refresh_selection_labels()
 
@@ -605,13 +678,22 @@ class SphinGOlipIDApp:
                         self.run_status.set(f"解析完成 · {len(self.result_df)} 条候选 · 耗时 {elapsed} 秒")
                     else:
                         self.run_status.set("解析已结束，但结果文件加载失败。")
+                        if self.current_result and Path(payload).resolve() == self.current_result.resolve():
+                            # This path now refers to the new export, so the old
+                            # preview can no longer serve as its Save As source.
+                            self.current_result = self.result_sheet = None
+                            self.result_sheet_var.set("")
+                            self.result_sheet_picker.configure(values=())
+                            self.result_df = pd.DataFrame()
+                            self.result_columns = []
+                            self._reset_filters()
+                            self._set_running_ui()
+                        self._show_run_error("结果文件加载失败", "可用“打开结果文件”重试。")
                 elif kind == "error":
                     self._finish_run()
                     self._append_log(f"解析失败：{payload}")
                     self.run_status.set("解析失败 · 查看运行日志，检查文件与参数后重试。")
-                    self.result_path.set("本次解析失败，尚未生成可查看的结果")
-                    self.empty_title.configure(text="解析失败")
-                    self.empty_hint.configure(text="检查右侧日志，返回解析设置修改后重试。")
+                    self._show_run_error("解析失败", "检查右侧日志，返回解析设置修改后重试。")
                     messagebox.showerror("解析失败", str(payload), parent=self.root)
         except queue.Empty:
             pass
@@ -622,26 +704,52 @@ class SphinGOlipIDApp:
                     self.run_status.set(f"解析中 · {self.run_stage} · 已用时 {seconds // 60:02d}:{seconds % 60:02d}")
                 self.queue_after = self.root.after(120, self._drain_queue)
 
+    def _show_run_error(self, title: str, hint: str) -> None:
+        if self.current_result is not None:
+            self.result_path.set(f"{title} · 显示上次打开的结果：{self.current_result}")
+        else:
+            self.result_path.set(title)
+            self.empty_title.configure(text=title)
+            self.empty_hint.configure(text=hint)
+
     def _append_log(self, text: str) -> None:
         self.log_text.configure(state=tk.NORMAL)
-        self.log_text.insert(tk.END, text + "\n")
+        is_warning = text.startswith("解析失败：") or any(f" {level} " in text for level in ("WARNING", "ERROR", "CRITICAL"))
+        self.log_text.insert(tk.END, text + "\n", ("warning",) if is_warning else ())
         self.log_text.see(tk.END)
         self.log_text.configure(state=tk.DISABLED)
 
-    def _load_result_table(self, path: Path) -> bool:
+    def _load_result_table(self, path: Path, sheet: str | None = None) -> bool:
         try:
-            frame = add_standard_score_columns(pd.read_excel(path))
-            if "total_score" not in frame:
-                legacy = next((column for column in SCORE_COLUMNS[1:] if column in frame), None)
-                if legacy is not None:
-                    # A view alias only: never rewrite the loaded workbook.
-                    frame["total_score"] = pd.to_numeric(frame[legacy], errors="coerce") * 100
+            with pd.ExcelFile(path, engine="openpyxl") as workbook:
+                sheets = workbook.sheet_names
+                if sheet is None:
+                    sheet = "annotations" if "annotations" in sheets else sheets[0]
+                if sheet == "parameters":
+                    # The mixed value column needs the original Excel types, including booleans.
+                    rows = workbook.book[sheet].values
+                    headers = next(rows, ())
+                    frame = pd.DataFrame(rows, columns=headers, dtype=object)
+                else:
+                    frame = workbook.parse(sheet, dtype=SCAN_ID_DTYPES, keep_default_na=False, na_values=[""])
+            frame.columns = frame.columns.map(str)
+            annotations = sheet in {"annotations", "spectrum_matches"} or any(col in frame for col in NAME_COLUMNS)
+            if annotations:
+                frame = add_standard_score_columns(frame)
+            score = next((column for column in SCORE_COLUMNS if column in frame), None)
+            if score is not None and score != "total_score":
+                # A view alias only. The workbook retains the original values.
+                factor = 100 if score in FRACTIONAL_SCORE_COLUMNS else 1
+                frame["total_score"] = pd.to_numeric(frame[score], errors="coerce") * factor
         except Exception as exc:
             messagebox.showerror("打开失败", str(exc), parent=self.root)
             return False
-        frame.columns = frame.columns.map(str)
         self.result_df = frame.reset_index(drop=True)
         self.current_result = path
+        self.result_has_annotation_report = {'annotations', 'input_files'} <= set(sheets)
+        self.result_sheet = sheet
+        self.result_sheet_picker.configure(values=sheets)
+        self.result_sheet_var.set(sheet)
         self.result_path.set(str(path))
         self.result_columns = []
         self.column_titles = {}
@@ -649,18 +757,29 @@ class SphinGOlipIDApp:
         for aliases, title, width in RESULT_FIELDS:
             column = next((col for col in aliases if col in frame.columns), None)
             if column is not None:
+                if column in {"signal_intensity", "Abund"}:
+                    title = "信号强度"
+                if column in {"observed_rt", "RT"} and "rt_minutes" not in frame:
+                    title = "保留时间 (min)"
                 self.result_columns.append(column)
                 self.column_titles[column] = title
                 self.column_widths[column] = width
-        if not self.result_columns:
-            self.result_columns = list(frame.columns[:12])
-            self.column_titles = {col: col for col in self.result_columns}
-            self.column_widths = {col: 140 for col in self.result_columns}
+        if not annotations or not self.result_columns:
+            for column in frame.columns:
+                if column not in self.column_titles:
+                    self.result_columns.append(column)
+                    self.column_titles[column] = column
+                    self.column_widths[column] = 140
         self._reset_filters()
-        self.score_filter_entry.configure(state=tk.NORMAL if any(col in frame for col in SCORE_COLUMNS) else tk.DISABLED)
-        self.export_button.configure(state=tk.DISABLED if self.running else tk.NORMAL)
-        self._set_detail(f"已加载 {len(frame)} 条候选，{len(frame.columns)} 个字段。\n\n点击候选行查看详情。\n点击表头可切换升序／降序。\n\n另存完整结果会保留原文件的全部工作表。")
+        self._set_running_ui()
+        self._set_detail(f"{sheet} · {len(frame)} 行，{len(frame.columns)} 个字段。\n\n点击一行查看详情。\n另存完整结果会保留所有工作表与外部碎片证据。")
         return True
+
+    def _change_result_sheet(self, _event: tk.Event | None = None) -> None:
+        sheet = self.result_sheet_var.get()
+        if self.current_result and sheet != self.result_sheet:
+            if not self._load_result_table(self.current_result, sheet=sheet):
+                self.result_sheet_var.set(self.result_sheet or "")
 
     def _schedule_filter(self, *_args: Any) -> None:
         if self.filter_after is not None:
@@ -696,37 +815,89 @@ class SphinGOlipIDApp:
         except ValueError as exc:
             self.filter_message.set(str(exc))
             return
-        self.filter_message.set("点击表头排序；最低得分留空时显示全部得分。")
+        self.filter_message.set("")
+        self.filtered_results = view
+        self.result_page = 0
+        self._render_result_page()
+
+    def _change_result_page(self, offset: int) -> None:
+        self.result_page += offset
+        self._render_result_page()
+
+    def _render_result_page(self) -> None:
+        view = self.filtered_results
+        pages = max(1, math.ceil(len(view) / RESULT_PAGE_SIZE))
+        self.result_page = max(0, min(self.result_page, pages - 1))
+        start = self.result_page * RESULT_PAGE_SIZE
+        visible = view.iloc[start:start + RESULT_PAGE_SIZE]
+        self.result_page_label.set(f"{self.result_page + 1} / {pages} 页" if pages > 1 else "")
+        self.previous_result_page.state(["!disabled"] if self.result_page else ["disabled"])
+        self.next_result_page.state(["!disabled"] if self.result_page + 1 < pages else ["disabled"])
+        self.peak_button.state(["disabled"])
         self.result_tree.delete(*self.result_tree.get_children())
         self.result_tree.configure(columns=self.result_columns)
         for col in self.result_columns:
             suffix = (" ▼" if self.sort_descending else " ▲") if col == self.sort_column else ""
-            self.result_tree.heading(col, text=self.column_titles[col] + suffix,
+            anchor = tk.E if col in NUMERIC_RESULT_COLUMNS else tk.W
+            self.result_tree.heading(col, text=self.column_titles[col] + suffix, anchor=anchor,
                                      command=lambda column=col: self._sort_results(column))
-            self.result_tree.column(col, width=self.column_widths[col], minwidth=75, anchor=tk.W,
+            self.result_tree.column(col, width=self.column_widths[col], anchor=anchor,
+                                    minwidth=200 if col in NAME_COLUMNS else 75,
                                     stretch=col == self.result_columns[0])
-        for display_index, (idx, row) in enumerate(view.iterrows()):
+        for display_index, row in enumerate(visible[self.result_columns].itertuples(name=None)):
+            idx, *values = row
             self.result_tree.insert("", tk.END, iid=str(idx),
-                                    values=[self._format_cell(row[col]) for col in self.result_columns],
+                                    values=[self._format_table_cell(col, value) for col, value in zip(self.result_columns, values)],
                                     tags=("alternate",) if display_index % 2 else ())
+        self.result_tree.yview_moveto(0)
         self.result_summary.set(f"显示 {len(view)} / 共 {len(self.result_df)} 条")
         if view.empty:
             if self.current_result:
-                self.empty_title.configure(text="结果文件中没有候选" if self.result_df.empty else "没有符合筛选条件的候选")
-                self.empty_hint.configure(text="尝试调整匹配参数后重新解析。" if self.result_df.empty else "修改脂质名称或最低得分，或重置筛选。")
+                self.empty_title.configure(text="当前工作表没有记录" if self.result_df.empty else "没有符合筛选条件的记录")
+                hint = "修改搜索或最低得分，或重置筛选。"
+                if self.result_df.empty:
+                    hint = "可切换至 features 或 spectrum_audit 查看提峰和关联情况。" if self.result_sheet == "annotations" else "可切换至其他工作表。"
+                self.empty_hint.configure(text=hint)
             self.empty_panel.place(relx=0.5, rely=0.45, anchor="center")
         else:
             self.empty_panel.place_forget()
-        self._set_detail("点击表格中的候选行，查看完整注释字段。")
+        self._set_detail("点击表格中的一行查看详情。")
 
     def _on_result_select(self, _event: tk.Event | None = None) -> None:
         selected = self.result_tree.selection()
         if not selected:
+            self.peak_button.state(["disabled"])
             return
         row = self.result_df.loc[int(selected[0])]
-        lines = [f"{self.column_titles.get(str(col), col)}: {self._format_cell(value, limit=2000)}"
-                 for col, value in row.items()]
+        from .peak_review import PEAK_FIELDS
+        available = PEAK_FIELDS.issubset(row.index) and row[list(PEAK_FIELDS)].notna().all()
+        self.peak_button.state(["!disabled"] if available else ["disabled"])
+        columns = dict.fromkeys([*self.result_columns, *row.index])
+        lines = [f"{self.column_titles.get(col, col)}: {self._format_cell(row[col], limit=2000)}"
+                 for col in columns]
         self._set_detail("\n\n".join(lines))
+        self.detail_text.yview_moveto(0)
+
+    def _open_peak_review(self) -> None:
+        from .peak_review import open_peak_review
+
+        selected = self.result_tree.selection()
+        if not selected or self.peak_button.instate(["disabled"]):
+            return
+        row = self.result_df.loc[int(selected[0])]
+        source = Path(row["source_path"])
+        if not source.is_file():
+            nearby = self.current_result.parent / source.name
+            if nearby.is_file():
+                source = nearby
+            else:
+                chosen = filedialog.askopenfilename(parent=self.root, title=f"定位原始文件 {source.name}",
+                                                    filetypes=[("mzML", "*.mzML *.mzml")])
+                if not chosen:
+                    return
+                source = Path(chosen)
+        directory = self.current_result.parent if self.current_result else None
+        open_peak_review(self.root, row, source, evidence_dir=directory)
 
     @staticmethod
     def _replace_text(widget: tk.Text, text: str) -> None:
@@ -737,6 +908,12 @@ class SphinGOlipIDApp:
 
     def _set_detail(self, text: str) -> None:
         self._replace_text(self.detail_text, text)
+
+    def _open_ecn_report(self) -> None:
+        from .ecn_dialog import AnnotationReviewDialog
+
+        if self.current_result and self.result_has_annotation_report and not self.running:
+            AnnotationReviewDialog(self.root, self.current_result)
 
     def _save_current_result_as(self) -> None:
         if self.running or not self.current_result:
@@ -751,6 +928,11 @@ class SphinGOlipIDApp:
             self.run_status.set(f"完整结果已另存到：{path}")
         except Exception as exc:
             messagebox.showerror("保存失败", str(exc), parent=self.root)
+
+    def _format_table_cell(self, column: str, value: Any) -> str:
+        if column in TABLE_DECIMALS and pd.api.types.is_number(value) and pd.notna(value):
+            return f"{value:.{TABLE_DECIMALS[column]}f}"
+        return self._format_cell(value)
 
     @staticmethod
     def _format_cell(value: Any, limit: int = 120) -> str:

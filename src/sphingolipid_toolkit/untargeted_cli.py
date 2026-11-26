@@ -15,7 +15,7 @@ def main(argv=None):
     tolerance=parser.add_mutually_exclusive_group()
     tolerance.add_argument('--fragment-ppm',type=float)
     tolerance.add_argument('--fragment-da',type=float)
-    parser.add_argument('--min-score',type=float,default=50.)
+    parser.add_argument('--min-total-score','--min-score',type=float,default=50.,help='Current MS2 total score threshold (0–100).')
     parser.add_argument('--top-n',type=int,default=1)
     parser.add_argument('--peakwidth-min',type=float,default=5.,help='seconds')
     parser.add_argument('--peakwidth-max',type=float,default=60.,help='seconds')
@@ -28,7 +28,7 @@ def main(argv=None):
         config=UntargetedConfig(tuple(args.mzml),args.output,polarity=args.polarity,
             precursor_ppm=args.precursor_ppm,
             fragment_ppm=None if args.fragment_da is not None else args.fragment_ppm if args.fragment_ppm is not None else 20.,
-            fragment_da=args.fragment_da,min_total_score=args.min_score,top_n=args.top_n,
+            fragment_da=args.fragment_da,min_total_score=args.min_total_score,top_n=args.top_n,
             peakwidth_min=args.peakwidth_min,peakwidth_max=args.peakwidth_max,
             noise=args.noise,snthresh=args.snthresh,rscript_path=args.rscript,save_intermediate=args.save_intermediate)
     except ValueError as exc:
@@ -39,6 +39,8 @@ def main(argv=None):
     logger.addHandler(handler)
     try:
         run_untargeted(config,logger)
+    except (OSError, ValueError, RuntimeError) as exc:
+        parser.error(str(exc))
     finally:
         logger.removeHandler(handler)
         handler.close()

@@ -1,83 +1,51 @@
-# GUI Guide
+# SphinGOlipID 桌面使用说明
 
-The Tkinter desktop GUI uses the current MS2 backend. Start it with
-`python -m sphingolipid_toolkit.gui` or the installed `sphingolipid-gui` command.
+运行 `sphingolipid-gui`，或在项目环境中运行 `python -m sphingolipid_toolkit.gui`。
+桌面流程使用当前鞘脂 MS2 鉴定引擎和 R/XCMS centWave。安装要求见 [README](../README.md)。
 
-## Desktop workflow
+## 导入与鉴定
 
-The app opens directly on **解析设置**. Select the original MS/MS TXT file,
-precursor target XLSX table, MS1 theoretical database, and output folder. Full
-paths appear beside each selection. **开始解析** becomes available after all
-four selections are supplied; missing files and invalid parameters are reported
-before a worker is started.
+1. 在 **解析设置** 中选择一个或多个包含质心化 MS1/MS2 数据的 `.mzML` 文件，再选择输出 `.xlsx`。XCMS 对每个文件独立提峰，无需目标表。
+2. 选择正或负离子模式，核对鉴定和提峰参数。碎片容差可切换 ppm 或 Da，两种单位各自记住所填的值。**恢复默认参数** 同时还原模式、容差和 XCMS 选项。
+3. 点击 **开始解析**。窗口底部显示当前阶段和耗时，结果页显示运行日志。运行期间锁定输入和鉴定参数。
 
-The five editable matching parameters use the backend defaults: fragment
-tolerance `20 ppm`, minimum fragment intensity `20`, minimum matched fragments
-`2`, minimum MS2 score `0.35`, and Top-N `3`. **恢复默认参数** restores these
-values. **保留中间文件** controls intermediate-file retention.
+| 参数 | 桌面默认值 |
+| --- | --- |
+| 离子模式 | 正模式 |
+| MS1 容差及 centWave ROI 容差 | 10 ppm |
+| MS2 碎片容差 | 20 ppm，切换至 Da 时初值为 0.3 Da |
+| 最低 MS2 总分 | 50 / 100 |
+| 每峰候选 Top-N | 1，保留引擎的同位次和碎片数排序规则 |
+| 峰宽 | 5–60 秒 |
+| 噪声、信噪比 | 1000、3 |
 
-During processing, the footer shows the current backend stage and elapsed time.
-The activity bar indicates work in progress; it does not estimate a completion
-percentage. Inputs and parameters are locked for the current run. Switching
-between tabs preserves the result view and logs.
+**保留 XCMS 峰表** 将原始 XCMS 峰表、运行信息和测量峰表保存到输出旁的 `<结果文件名>_xcms` 目录。旧绝对碎片强度、最少碎片数和 0–1 覆盖分数参数已经停用。
 
-The **MS2 注释结果** tab opens the completed file automatically and also accepts
-existing XLSX results via **打开已有结果** / **打开结果文件**. It provides:
+正离子 GM2 和 GM3 的 HG 池含 8 个核心通道。Y/Z 和 B 合并计数，至少 4 个通道各自匹配到独立实测峰即可通过头基判定。报告链组成还需匹配相应长链碱基的脱水离子，强度至少为原谱基峰的 1%。
 
-- case-insensitive, literal lipid-name search;
-- minimum-score filtering, with a blank threshold showing all scores;
-- numeric or text sorting by clicking a heading again to reverse the order;
-- displayed/total candidate counts, empty-state guidance, and row details;
-- read-only run logs and candidate details;
-- **另存完整结果**, which copies the original workbook with every worksheet,
-  regardless of the current display filters.
+## 查看和导出
 
-The GUI runs MS2 matching. RT validation and result cleaning remain separate
-workflows and are not implied by the result-tab title.
+完成后自动打开 `annotations`。也可用 **打开已有结果** 导入 `.xlsx`，再通过工作表下拉框切换页。表头支持排序，搜索和分数筛选作用于当前整张工作表。每页最多显示 500 行，点击任意行可查看详情。
 
-### Desktop screenshots
+| 工作表 | 内容 |
+| --- | --- |
+| `annotations` | 每个局部峰选出的最佳采集谱与其候选 |
+| `features` | XCMS 检出的所有局部峰、实测峰顶、峰面积和鉴定状态 |
+| `spectrum_matches` | 每张通过鉴定的采集谱及候选 |
+| `spectrum_audit` | MS2 与局部峰的关联状态，包括未检测到局部峰的情况 |
+| `parameters` | 本次鉴定和提峰参数、引擎版本、库来源 |
+| `input_files` | 输入路径、文件大小以及实际 R 和 XCMS 版本 |
 
-![Setup and matching parameters](images/gui_setup.png)
+表中的峰顶 RT 指实测 MS1 峰顶，MS2 RT 指采集碎片谱的时间。选中带实测峰和原始扫描记录的候选，点击 **查看峰图与质谱** 可打开 EIC 和 MS2。原始 mzML 已迁移时，界面会提示重新定位文件。
 
-![MS2 result review before loading a workbook](images/gui_results.png)
+**MS1** 显示 m/z 提取窗口和 RT 积分区间，并在区间内给曲线下方填色。**MS2** 显示采集 RT、高亮匹配峰，并标注代表峰的实测 m/z。下方表格列出全部匹配峰和计分池，支持池显示为 **Common**。
 
-## Backend Entry Point
+**另存完整结果** 保留整份工作簿和引用的 `ms2-evidence-*.json.gz` 文件。筛选、排序及翻页只影响预览。失败的重跑保留已打开的上次结果，结果页会标明其来源。
 
-GUI code should construct `SphinGOlipIDConfig` from user controls and call:
+## ECN 复核与样本峰面积导出
 
-```python
-from sphingolipid_toolkit import SphinGOlipIDConfig
-from sphingolipid_toolkit.ms2_pipeline import run_batch
+1. 在结果页打开 **ECN 复核与导出**。可直接导出，也可先设置 RT 窗口（默认 ±0.20 min），再点击 **Run ECN**。在 **Series** 中选择拟合系列，查看实测 RT、拟合 RT、偏差和判定。
+2. ECN 使用属于同系系列的显式双链鉴定，以各样本、各离子模式和各加合离子的 Top1 峰顶 RT 拟合。结果标为窗口内、窗口外或未建模。选择 **Exclude candidates outside the RT window** 可从鉴定表中排除窗口外候选，未建模候选仍可导出。
+3. 点击 **Export Annotation Table**。新 Excel 的 `identification_table` 每份样本有一列 XCMS 积分峰面积。`samples` 对应列名和样本路径，`area_sources` 追溯到原鉴定行和 XCMS 峰，`ecn_review` 和 `ecn_models` 记录复核和拟合。原始结果及引用的碎片证据也随表保存。
 
-results = run_batch(config)
-```
-
-The GUI should not call functions in `ms2_legacy_core.py` directly.
-
-## Possible future pages
-
-1. Project setup: paths, project name, ion mode.
-2. MS2 matching parameters: ppm, intensity cutoff, min fragments, score cutoff, top-N.
-3. Run monitor: progress, logs, warnings, result paths.
-4. Results review: table filters and downloads.
-5. Visualization: class distribution, score distributions, matched-fragment plot.
-6. RT validation: planned after backend integration.
-7. Result cleaning: planned after backend integration.
-
-## Logging
-
-Use `logging_utils.attach_memory_handler()` to collect backend log messages for display in the GUI.
-
-## Result Display
-
-Prefer the standard alias columns added in v0.3:
-
-```text
-lipid_name
-observed_mz
-observed_rt
-matched_fragment_count
-ms2_match_score
-rank
-```
-
+同一行的跨样本面积来自同名、同极性、同加合离子和同报告层级的实测峰，要求每份样本各一个匹配峰，峰顶 RT 跨度不超过 0.20 min，m/z 跨度符合原 MS1 容差。遇到同一样本的重复峰或超出容差时，分别列出各个实测峰。缺失峰面积留空，实测 0 仍显示为 0。

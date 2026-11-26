@@ -23,7 +23,8 @@ from .io_utils import (
     protected_library_paths,
 )
 from .logging_utils import attach_file_handler, configure_logging, get_logger
-from .rt_validation import add_series_columns, fit_ransac_models, predict_rt
+from .rt_iup import RTIUPConfig, fit_line, predict_values
+from .rt_validation import add_series_columns
 from .scoring import add_standard_score_columns
 
 
@@ -47,7 +48,7 @@ class TargetedMzMLConfig:
     feature_merge_ppm: float = 10.0
     feature_merge_mz_tolerance_da: float = 0.005
     feature_merge_rt_tolerance_min: float = 0.05
-    rt_fit_residual_threshold: float = 0.1
+    rt_fit_residual_threshold: float = RTIUPConfig().rt_window_min
     rt_fit_min_points: int = 3
     log_file_name: str = "targeted_mzml_run_log.txt"
     raw_result_name: str = "targeted_mzml_raw_identifications.xlsx"
@@ -154,7 +155,10 @@ def run_targeted_mzml_batch(
     output_dir = ensure_output_dir(config.output_dir)
     handler = attach_file_handler(output_dir / config.log_file_name, logger=logger)
     try:
-        logger.info("Effective fragment_ppm=%s (targeted mzML workflow config)", config.fragment_ppm)
+        if config.fragment_da is not None:
+            logger.info("Effective fragment_da=%s (targeted mzML workflow config)", config.fragment_da)
+        else:
+            logger.info("Effective fragment_ppm=%s (targeted mzML workflow config)", config.fragment_ppm)
         return _run_targeted_mzml_batch(config, logger)
     finally:
         logger.removeHandler(handler)
@@ -175,8 +179,8 @@ def _run_targeted_mzml_batch(config: TargetedMzMLConfig, logger: logging.Logger)
         rt_tolerance_min=config.feature_merge_rt_tolerance_min,
     )
     library = pd.DataFrame()
-    write_excel_atomic(targetlist_raw, output_dir / config.raw_targetlist_name, index=False)
-    write_excel_atomic(features, output_dir / config.feature_table_name, index=False)
+    write_excel_atomic(targetlist_raw, output_dir / config.raw_targetlist_name, index=False, literal_strings=True)
+    write_excel_atomic(features, output_dir / config.feature_table_name, index=False, literal_strings=True)
 
     logger.info("Matching targeted mzML files")
     raw_results = annotate_mzml_directory(features, library, config, logger=logger)
@@ -413,44 +417,42 @@ def finalize_spectrum_matches(*args,**kwargs):
 
 
 def apply_rt_fit_filter(results: pd.DataFrame, config: TargetedMzMLConfig) -> pd.DataFrame:
-    """Remove RANSAC-excluded RT outliers while keeping not-evaluated rows."""
+    """Apply the selected ECN curve while retaining unevaluated series."""
 
     if results.empty:
         return results.copy()
-    data = results.copy()
-    annotation_col = "lipid_name" if "lipid_name" in data.columns else "注释"
-    data = add_series_columns(data, annotation_col=annotation_col, drop_unparsed=False)
+    annotation_col = "lipid_name" if "lipid_name" in results.columns else "注释"
+    data = add_series_columns(results, annotation_col=annotation_col, drop_unparsed=False).reset_index(drop=True)
     data["rt_validation_status"] = "not_evaluated"
     data["predicted_rt"] = np.nan
     data["rt_error"] = np.nan
-
-    modelable = data.dropna(subset=["series", "x", "ms1_rt"]).copy()
-    if modelable.empty:
-        return data
-    counts = modelable.groupby("series")["identification_id"].transform("count")
-    modelable = modelable[counts >= config.rt_fit_min_points].copy()
-    if modelable.empty:
-        return data
-
-    inliers, models = fit_ransac_models(
-        modelable,
-        series_col="series",
-        x_col="x",
-        y_col="ms1_rt",
-        residual_threshold=config.rt_fit_residual_threshold,
-        min_points_small_series=config.rt_fit_min_points,
-        min_points_large_series=config.rt_fit_min_points,
+    data["rt_fit_strategy"] = None
+    fit_config = RTIUPConfig(
+        rt_window_min=config.rt_fit_residual_threshold,
+        linear_min_distinct_x=config.rt_fit_min_points,
+        quadratic_min_distinct_x=config.rt_fit_min_points,
     )
-    if models.empty:
-        return data
-
-    predicted = predict_rt(data, models, series_col="series", x_col="x")
-    data["predicted_rt"] = predicted["pred_y"]
-    data["rt_error"] = data["ms1_rt"] - data["predicted_rt"]
-    modeled_ids = set(modelable.loc[modelable["series"].isin(models["series"]), "identification_id"])
-    inlier_ids = set(inliers["identification_id"]) if "identification_id" in inliers.columns else set()
-    data.loc[data["identification_id"].isin(modeled_ids), "rt_validation_status"] = "outlier"
-    data.loc[data["identification_id"].isin(inlier_ids), "rt_validation_status"] = "pass"
+    rt = pd.to_numeric(data["ms1_rt"], errors="coerce")
+    modelable = data.loc[data["series"].notna() & data["x"].notna() & np.isfinite(rt)]
+    groups = ["series"] + [name for name in ("polarity", "adduct") if name in data]
+    for _, group in modelable.groupby(groups, sort=False, dropna=False):
+        fit_input = pd.DataFrame({
+            "细类": group["series"],
+            "曲线不饱和度": 0,
+            "x碳数": group["x"],
+            "归一化保留时间": rt.loc[group.index],
+        })
+        curve = fit_line(fit_input, fit_config)
+        if not curve["拟合成功"]:
+            continue
+        predicted = predict_values(curve["拟合类型"], curve["参数"], group["x"].to_numpy(dtype=float))
+        error = rt.loc[group.index] - predicted
+        data.loc[group.index, "predicted_rt"] = predicted
+        data.loc[group.index, "rt_error"] = error
+        data.loc[group.index, "rt_fit_strategy"] = curve["fit_strategy"]
+        data.loc[group.index, "rt_validation_status"] = np.where(
+            error.abs() <= fit_config.rt_window_min, "pass", "outlier"
+        )
     return data[data["rt_validation_status"] != "outlier"].reset_index(drop=True)
 
 
@@ -666,32 +668,39 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--targetlist-dir", type=Path, default=None, help="Folder containing Agilent targetlist CSV files.")
     parser.add_argument("--mzml-dir", type=Path, default=None, help="Folder containing mzML files. Defaults to --data-dir.")
     parser.add_argument("--output-dir", required=True, type=Path, help="Output folder.")
-    parser.add_argument("--fragment-ppm", type=float, default=TARGETED_FRAGMENT_PPM, help=f"MS2 fragment matching tolerance in ppm. Default: {TARGETED_FRAGMENT_PPM:g}.")
+    tolerance = parser.add_mutually_exclusive_group()
+    tolerance.add_argument("--fragment-ppm", type=float, default=TARGETED_FRAGMENT_PPM, help=f"MS2 fragment matching tolerance in ppm. Default: {TARGETED_FRAGMENT_PPM:g}.")
+    tolerance.add_argument("--fragment-da", type=float, help="Use an absolute MS2 tolerance instead of ppm.")
     parser.add_argument("--ms1-ppm", type=float, default=10.0, help="MS1 library candidate tolerance in ppm. Default: 10.")
     parser.add_argument("--feature-ppm", type=float, default=10.0, help="mzML precursor to targetlist feature tolerance in ppm. Default: 10.")
+    parser.add_argument("--rt-window-min", type=float, default=RTIUPConfig().rt_window_min,
+                        help="Absolute RT residual window in minutes. Default: 0.20.")
     parser.add_argument("--top-n", type=int, default=3)
     parser.add_argument("--ms2-library",type=Path)
-    parser.add_argument("--fragment-da",type=float)
     parser.add_argument("--min-total-score",type=float,default=50.)
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args(argv)
 
-    logger = configure_logging(args.log_level.upper(), logger_name="sphingolipid_toolkit.targeted_mzml")
-    config = TargetedMzMLConfig(
-        data_dir=args.data_dir,
-        targetlist_dir=args.targetlist_dir,
-        mzml_dir=args.mzml_dir,
-        ms1_library_path=None,
-        output_dir=args.output_dir,
-        fragment_ppm=args.fragment_ppm,
-        ms1_candidate_ppm=args.ms1_ppm,
-        feature_mz_ppm=args.feature_ppm,
-        top_n=args.top_n,
-        ms2_library_path=args.ms2_library,
-        fragment_da=args.fragment_da,
-        min_total_score=args.min_total_score,
-    )
-    outputs = run_targeted_mzml_batch(config, logger=logger)
+    try:
+        logger = configure_logging(args.log_level.upper(), logger_name="sphingolipid_toolkit.targeted_mzml")
+        config = TargetedMzMLConfig(
+            data_dir=args.data_dir,
+            targetlist_dir=args.targetlist_dir,
+            mzml_dir=args.mzml_dir,
+            ms1_library_path=None,
+            output_dir=args.output_dir,
+            fragment_ppm=args.fragment_ppm,
+            ms1_candidate_ppm=args.ms1_ppm,
+            feature_mz_ppm=args.feature_ppm,
+            rt_fit_residual_threshold=args.rt_window_min,
+            top_n=args.top_n,
+            ms2_library_path=args.ms2_library,
+            fragment_da=args.fragment_da,
+            min_total_score=args.min_total_score,
+        )
+        outputs = run_targeted_mzml_batch(config, logger=logger)
+    except (ValueError, OSError) as exc:
+        parser.error(str(exc))
     print("Generated output files:")
     for key, path in outputs.items():
         print(f"- {key}: {path}")

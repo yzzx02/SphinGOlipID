@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass
 from math import isfinite
 from pathlib import Path
@@ -54,19 +55,47 @@ def ensure_output_dir(path: str | Path) -> Path:
     return output_dir
 
 
-def write_excel_atomic(data: pd.DataFrame, path: str | Path, **kwargs) -> Path:
+def write_excel_atomic(data: pd.DataFrame, path: str | Path, *, literal_strings=False, **kwargs) -> Path:
     """Replace an Excel result only after a complete workbook has been written."""
 
     destination = Path(path)
+    with _atomic_output_path(destination) as temporary:
+        if literal_strings:
+            with identification_excel_writer(temporary) as writer:
+                data.to_excel(writer, **kwargs)
+        else:
+            data.to_excel(temporary, **kwargs)
+    return destination
+
+
+@contextmanager
+def _atomic_output_path(destination: Path):
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with NamedTemporaryFile(dir=destination.parent, prefix=".sphingolipid_result_", suffix=destination.suffix, delete=False) as handle:
+    with NamedTemporaryFile(dir=destination.parent, prefix=".sphingolipid_result_", suffix=destination.suffix.lower(), delete=False) as handle:
         temporary = Path(handle.name)
     try:
-        data.to_excel(temporary, **kwargs)
+        yield temporary
         temporary.replace(destination)
     finally:
         temporary.unlink(missing_ok=True)
-    return destination
+
+
+def write_parsed_fragments(data: pd.DataFrame, path: Path) -> None:
+    """Keep standardized text-export peaks for explicitly requested review."""
+    with _atomic_output_path(path) as temporary:
+        data.to_csv(temporary, index=False, encoding="utf-8-sig")
+
+
+@contextmanager
+def identification_excel_writer(path: Path):
+    """Keep provenance strings as data, including paths that start with '='."""
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        yield writer
+        for sheet in writer.sheets.values():
+            for row in sheet.rows:
+                for cell in row:
+                    if cell.data_type in {"f", "e"}:
+                        cell.data_type = "s"
 
 
 def require_columns(data: pd.DataFrame, required_columns: Iterable[str], context: str) -> None:
@@ -141,13 +170,17 @@ def protected_library_paths(config: object) -> set[Path]:
     """Protect selected reference inputs and the bundled scientific assets."""
     from importlib.resources import files
     protected=set()
-    for name in ('ms1_library_path','ms1_db_path','ms2_library_path'):
+    for name in ('ms1_library_path','ms1_db_path','ms2_library_path','library_path'):
         selected=getattr(config,name,None)
         if selected is not None:protected.add(Path(selected).resolve())
     bundled=Path(str(files('sphingolipid_toolkit').joinpath('data','ms2')))
     protected.update((bundled/f'sphingolipid_{mode}{suffix}').resolve()
         for mode in ('positive','negative') for suffix in ('.sqlite','.msp.gz'))
     return protected
+
+
+def parsed_fragments_path(config: object, file_index: int) -> Path:
+    return Path(config.output_dir) / config.intermediate_dir_name / f"parsed_ms2-{file_index}.csv"
 
 
 def validate_output_paths(config: object, file_indices: Sequence[int]) -> None:
@@ -157,11 +190,13 @@ def validate_output_paths(config: object, file_indices: Sequence[int]) -> None:
     protected=protected_library_paths(config)
     protected.update(path.resolve() for item in paths for path in (item.text_file, item.target_file))
     output_dir = Path(config.output_dir)
-    intermediate = output_dir / config.intermediate_dir_name
     outputs = [item.result_file for item in paths]
-    outputs.extend(output_dir / name for name in (config.final_result_name, config.log_file_name))
-    outputs.extend(intermediate / name for name in ("Isomer.xlsx", "out_DB.csv", "out-query.csv", "目标母离子.xlsx"))
-    outputs.extend(intermediate / f"{prefix}-{i}.xlsx" for i in file_indices for prefix in ("actual_ms2_data", "DB_sheet"))
+    outputs.append(output_dir / config.final_result_name)
+    if any(path.suffix.lower() != ".xlsx" for path in outputs):
+        raise InputValidationError("Result workbook filenames must end in .xlsx")
+    outputs.append(output_dir / config.log_file_name)
+    if getattr(config, "save_intermediate", False):
+        outputs.extend(parsed_fragments_path(config, i) for i in file_indices)
     if any(path.resolve() in protected for path in outputs):
         raise InputValidationError("An output file would overwrite a selected input file; choose another output folder or result name")
     resolved_outputs = [path.resolve() for path in outputs]

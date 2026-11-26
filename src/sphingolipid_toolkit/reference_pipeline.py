@@ -8,7 +8,7 @@ import pandas as pd
 
 from .config import validate_matching_parameters
 from .engine import SphingolipidIdentifier, compatible_frame, config_from_workflow
-from .io_utils import parse_ms2_text_to_dataframe, read_precursor_table, write_excel_atomic, require_file
+from .io_utils import parse_ms2_text_to_dataframe, parsed_fragments_path, read_precursor_table, require_file, write_parsed_fragments
 from .result_writer import write_identifications
 
 
@@ -40,6 +40,8 @@ def run_text_file(config, file_index, logger=None):
             if not frame.empty: rows.append(frame)
     data = pd.concat(rows,ignore_index=True) if rows else compatible_frame([])
     path = Path(config.output_dir)/config.result_pattern.format(i=file_index)
+    if getattr(config, 'save_intermediate', False):
+        write_parsed_fragments(fragments, parsed_fragments_path(config, file_index))
     write_identifications(data,path)
     logger.info('SphinGOlipID reference engine: %s candidates exported to %s',len(data),path)
     return path

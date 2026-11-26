@@ -147,6 +147,30 @@ def test_setup_controls_fit_at_minimum_window_size(app):
     app.root.withdraw()
 
 
+def test_result_layout_shows_name_and_readable_measurements(app, tmp_path):
+    source = tmp_path / "measurements.xlsx"
+    pd.DataFrame({
+        "scan_id": ["scan_42"], "lipid_name": ["Cer(d18:1/16:0)"],
+        "observed_mz": [538.5225925995], "apex_rt_min": [40 / 60],
+        "observed_rt": [0.67], "total_score": [86.6667], "rank": [1],
+        "matched_fragment_count": [3], "source_file": ["input.mzML"],
+    }).to_excel(source, index=False)
+    app.root.geometry("1000x640")
+    app.root.deiconify()
+    app.show_results()
+    assert app._load_result_table(source)
+    app.result_tree.selection_set("0")
+    app.root.update()
+    assert app.result_tree.column("lipid_name", "width") >= 200
+    assert app.detail_text.winfo_viewable() and app.detail_text.winfo_width() >= 180
+    assert app.result_tree.set("0", "observed_mz") == "538.52259"
+    assert app.result_tree.set("0", "apex_rt_min") == "0.667"
+    assert app.result_tree.set("0", "total_score") == "86.6667"
+    details = app.detail_text.get("1.0", tk.END)
+    assert details.startswith("脂质名称: Cer(d18:1/16:0)")
+    assert "538.5225925995" in details and "scan_42" in details
+
+
 def test_run_freezes_parameters_preserves_navigation_and_recovers_controls(app, tmp_path, monkeypatch):
     select_inputs(app, tmp_path)
     app.parameter_vars["fragment_ppm"].set("12.5")
@@ -373,6 +397,61 @@ def test_legacy_scores_display_as_percent_without_rewriting_original(app, tmp_pa
     assert source.read_bytes() == original
 
 
+def test_workbook_previews_annotations_then_pages_full_filtered_table(app, tmp_path, monkeypatch):
+    monkeypatch.setattr(gui, "RESULT_PAGE_SIZE", 2)
+    source = tmp_path / "workbook.xlsx"
+    with pd.ExcelWriter(source) as writer:
+        pd.DataFrame({"parameter": ["mode"], "value": ["+"]}).to_excel(writer, sheet_name="parameters", index=False)
+        pd.DataFrame({"lipid_name": ["Cer A", "SM B", "Cer C", "Cer D"],
+                      "总分数": ["9", "bad", "90", "100"], "匹配度分数": [.8, .7, .6, .5],
+                      "native_scan_id": ["0001", "0002", "0003", "0004"],
+                      "rank": [1, 1, 2, 2], "peak_area": [10, 20, 30, 40]}).to_excel(writer, sheet_name="annotations", index=False)
+        pd.DataFrame({"xcms_peak_id": ["CP2"], "annotation_status": ["no_qualified_local_ms2"],
+                      "peak_area": [122]}).to_excel(writer, sheet_name="features", index=False)
+        pd.DataFrame({f"audit_column_{index}": [index] for index in range(25)}).to_excel(writer, sheet_name="spectrum_audit", index=False)
+
+    assert app._load_result_table(source)
+    assert app.result_sheet == "annotations"
+    assert app.result_df.native_scan_id.iloc[0] == "0001"
+    assert app.result_tree.get_children() == ("0", "1")
+    app._sort_results("total_score")
+    assert app.result_tree.get_children() == ("0", "2")
+    app.next_result_page.invoke()
+    assert app.result_tree.get_children() == ("3", "1")
+    app.result_tree.selection_set("3")
+    app._on_result_select()
+    assert "0004" in app.detail_text.get("1.0", tk.END)
+    app.score_filter_var.set("90")
+    app._apply_filters()
+    assert app.result_tree.get_children() == ("2", "3")
+    assert app.next_result_page.instate(["disabled"])
+
+    app.result_sheet_var.set("features")
+    app._change_result_sheet()
+    assert app.result_df.annotation_status.tolist() == ["no_qualified_local_ms2"]
+    assert app.result_tree.set("0", "peak_area") == "122"
+    assert app.score_filter_entry.instate(["disabled"])
+    assert app.score_filter_var.get() == ""
+    app.root.attributes("-alpha", 0)
+    app.root.geometry("1000x640")
+    app.root.deiconify()
+    app.show_results()
+    app.result_sheet_var.set("spectrum_audit")
+    app._change_result_sheet()
+    app.root.update()
+    assert app.detail_text.winfo_viewable() and app.detail_text.winfo_width() >= 180
+    assert app.log_text.winfo_viewable() and app.log_text.winfo_width() >= 180
+
+
+def test_parameter_preview_preserves_excel_booleans_and_numbers(app, tmp_path):
+    source = tmp_path / "parameters.xlsx"
+    pd.DataFrame({"parameter": ["keep_xcms", "overwrite", "top_n", "polarity"],
+                  "value": [True, False, 1, "+"]}).to_excel(source, sheet_name="parameters", index=False)
+
+    assert app._load_result_table(source)
+    assert [app.result_tree.set(iid, "value") for iid in app.result_tree.get_children()] == ["True", "False", "1", "+"]
+
+
 @pytest.mark.parametrize("value", ["101", "nan", "not a score"])
 def test_invalid_score_filter_keeps_previous_view_and_explains_error(app, tmp_path, value):
     source = tmp_path / "result.xlsx"
@@ -390,6 +469,40 @@ def test_current_total_score_takes_precedence_over_legacy_alias():
     original = frame.copy(deep=True)
     assert gui.filter_result_rows(frame, min_score=70).index.tolist() == [0]
     pd.testing.assert_frame_equal(frame, original)
+
+
+def test_failed_new_run_leaves_previous_result_visible(app, tmp_path, monkeypatch):
+    select_inputs(app, tmp_path)
+    source = tmp_path / "previous.xlsx"
+    result_workbook(source)
+    assert app._load_result_table(source)
+    previous = app.result_tree.get_children()
+    monkeypatch.setattr(gui.messagebox, "showerror", lambda *args, **kwargs: None)
+    monkeypatch.setattr(gui.threading.Thread, "start", lambda self: None)
+    app._start_run()
+    assert app.export_button.instate(["disabled"])
+    app.ui_queue.put(("error", "XCMS failure"))
+    app.root.after_cancel(app.queue_after)
+    app._drain_queue()
+    assert app.current_result == source and app.result_tree.get_children() == previous
+    assert "上次打开的结果" in app.result_path.get()
+    assert app.export_button.instate(["!disabled"])
+
+
+def test_new_export_at_same_path_cannot_be_saved_from_a_stale_preview(app, tmp_path, monkeypatch):
+    source = tmp_path / "result.xlsx"
+    result_workbook(source)
+    assert app._load_result_table(source)
+    source.write_bytes(b"unreadable replacement")
+    monkeypatch.setattr(gui.messagebox, "showerror", lambda *args, **kwargs: None)
+    app.running = True
+    app.ui_queue.put(("done", source))
+    app.root.after_cancel(app.queue_after)
+    app._drain_queue()
+    assert app.current_result is None
+    assert not app.result_tree.get_children()
+    assert app.export_button.instate(["disabled"])
+    assert "加载失败" in app.result_path.get()
 
 
 def external_result(tmp_path):

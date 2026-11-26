@@ -1,9 +1,8 @@
 """Retention-time ECN/IUP validation and plotting utilities.
 
 This module contains the retention-time workflow used by the local analysis
-scripts: per-unsaturation RANSAC linear/quadratic fitting, IUP ordering checks,
-strict rescue of missing curves from raw candidates, and publication-style RT
-plots with 95% confidence bands.
+scripts: independent IOLS and RANSAC fitting per unsaturation, IUP ordering
+checks, rescue of missing curves, and RT plots with 95% confidence bands.
 """
 
 from __future__ import annotations
@@ -62,7 +61,7 @@ class RTIUPConfig:
     flat_slope_min: float = 0.03
     rescue_min_distinct_x: int = 3
     short_series_max_crossed_unsats: int = 1
-    max_refit_iterations: int = 5
+    max_refit_iterations: int | None = None
     quadratic_min_distinct_x: int = 4
     parallel_min_overlap_x: float = 2.0
     parallel_abs_slope_tolerance: float = 0.10
@@ -80,6 +79,7 @@ class RTIUPConfig:
     legend_font_size: int = 14
     axis_label_size: int = 18
     tick_label_size: int = 16
+    linear_min_distinct_x: int = 3
 
 
 @dataclass(frozen=True)
@@ -187,15 +187,6 @@ def color_for_unsaturation(value: object, config: RTIUPConfig = RTIUPConfig()) -
     return config.colors[int(parsed) % len(config.colors)]
 
 
-def _model_params(model: object, fit_type: str) -> list[float]:
-    if fit_type == "Linear":
-        estimator = model.estimator_
-        return [float(estimator.coef_[0]), float(estimator.intercept_)]
-    estimator = model.estimator_
-    lin = estimator.named_steps["linearregression"]
-    return [float(lin.coef_[1]), float(lin.coef_[0]), float(lin.intercept_)]
-
-
 def predict_values(fit_type: object, params: object, x: np.ndarray | float) -> np.ndarray | float | None:
     """Predict RT values from serialized linear/quadratic parameters."""
 
@@ -222,26 +213,30 @@ def fit_prediction(line: pd.Series, x: np.ndarray | float) -> np.ndarray | float
     return predict_values(line.get("拟合类型"), line.get("参数"), x)
 
 
-def _is_positive_monotonic(fit_type: str, params: list[float], x_min: float, x_max: float, config: RTIUPConfig) -> bool:
-    if x_max <= x_min:
+def _is_positive_monotonic(fit_type: str, params: list[float], x_min: float, x_max: float) -> bool:
+    if x_max <= x_min or not all(math.isfinite(p) for p in params):
         return False
-    x_grid = np.linspace(x_min, x_max, 100)
-    y_grid = predict_values(fit_type, params, x_grid)
-    if y_grid is None:
-        return False
-    y_grid = np.asarray(y_grid, dtype=float)
-    if not np.all(np.isfinite(y_grid)):
-        return False
-    return bool((y_grid[-1] - y_grid[0]) > 0 and np.mean(np.diff(y_grid) < -0.01) <= 0.05)
+    if fit_type == "Linear":
+        return params[0] > 0
+    # The derivative of a quadratic is linear, so its extrema are at the
+    # interval endpoints. Zero at one endpoint still permits strict increase.
+    a, b, _ = params
+    slopes = (2 * a * x_min + b, 2 * a * x_max + b)
+    return all(math.isfinite(s) for s in slopes) and min(slopes) >= 0 and max(slopes) > 0
+
+
+def _rt_points(points: pd.DataFrame) -> pd.DataFrame:
+    columns = ["x碳数", "归一化保留时间"]
+    clean = points[columns].dropna().astype(float)
+    return clean.loc[np.isfinite(clean).all(axis=1)]
 
 
 def _median_points_by_x(points: pd.DataFrame) -> pd.DataFrame:
-    clean = points[["x碳数", "归一化保留时间"]].dropna().copy()
+    clean = _rt_points(points)
     if clean.empty:
         return clean
     return (
-        clean.astype({"x碳数": float, "归一化保留时间": float})
-        .groupby("x碳数", as_index=False)["归一化保留时间"]
+        clean.groupby("x碳数", as_index=False)["归一化保留时间"]
         .median()
         .sort_values("x碳数")
         .reset_index(drop=True)
@@ -294,65 +289,72 @@ def iterative_refit(
     fit_type: str,
     config: RTIUPConfig = RTIUPConfig(),
 ) -> tuple[object, pd.DataFrame] | None:
-    """RANSAC-seed a fit, remove residual outliers, and refit to stability.
+    """Fit IOLS from all carbon-wise representatives, with no random seed."""
+    return _fit_iols(_median_points_by_x(points), fit_type, config)
 
-    Input points are first represented by one median RT per carbon number.  A
-    final ordinary least-squares fit is always performed on the stable inlier
-    set, so serialized parameters never come from an obsolete RANSAC sample.
-    """
 
-    active = _median_points_by_x(points)
-    min_distinct_x = 3 if fit_type == "Linear" else config.quadratic_min_distinct_x
-    min_samples = 2 if fit_type == "Linear" else 3
-    if len(active) < min_distinct_x:
-        return None
+def _minimum_fit_points(fit_type: str, config: RTIUPConfig) -> int:
+    if fit_type == "Linear":
+        return max(3, config.linear_min_distinct_x)
+    return max(4, config.quadratic_min_distinct_x)
 
-    x = active["x碳数"].to_numpy(dtype=float).reshape(-1, 1)
-    y = active["归一化保留时间"].to_numpy(dtype=float)
+
+def _fit_coordinates(points: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    return points[["x碳数"]].to_numpy(dtype=float), points["归一化保留时间"].to_numpy(dtype=float)
+
+
+def _accepted_r2(r2: float, fit_type: str, params: list[float], x: np.ndarray, config: RTIUPConfig) -> bool:
+    return (
+        math.isfinite(r2) and r2 >= config.r2_threshold
+        and _is_positive_monotonic(fit_type, params, float(x.min()), float(x.max()))
+    )
+
+
+def _fit_iols(points: pd.DataFrame, fit_type: str, config: RTIUPConfig) -> tuple[object, pd.DataFrame] | None:
+    """Fit on all representatives, removing the largest residual at each failed fit."""
+    active = points
+    minimum = _minimum_fit_points(fit_type, config)
+    removals = 0
+    while len(active) >= minimum:
+        x, y = _fit_coordinates(active)
+        model = _base_estimator(fit_type).fit(x, y)
+        predicted = model.predict(x)
+        params = _direct_model_params(model, fit_type)
+        if _accepted_r2(float(r2_score(y, predicted)), fit_type, params, x, config):
+            return model, active
+        if len(active) == minimum or (config.max_refit_iterations is not None and removals >= config.max_refit_iterations):
+            break
+        worst = int(np.argmax(np.abs(y - predicted)))
+        active = active.drop(active.index[worst])
+        removals += 1
+    return None
+
+
+def _fit_ransac(points: pd.DataFrame, fit_type: str, config: RTIUPConfig) -> tuple[object, pd.DataFrame] | None:
+    """Fit independently by consensus and use the estimator refit on that consensus."""
+    x, y = _fit_coordinates(points)
     ransac = RANSACRegressor(
         estimator=_base_estimator(fit_type),
-        min_samples=min_samples,
+        min_samples=2 if fit_type == "Linear" else 3,
         residual_threshold=config.rt_window_min,
+        loss="absolute_error",
         random_state=config.random_state,
         max_trials=300,
     )
     try:
         ransac.fit(x, y)
-    except Exception:
+    except ValueError:
         return None
-    seed_mask = np.asarray(ransac.inlier_mask_, dtype=bool)
-    if int(seed_mask.sum()) < min_distinct_x:
+    inliers = points.loc[ransac.inlier_mask_]
+    if len(inliers) < _minimum_fit_points(fit_type, config):
         return None
-    active = active.loc[seed_mask].copy()
-
-    for _ in range(config.max_refit_iterations):
-        model = _base_estimator(fit_type)
-        x_active = active["x碳数"].to_numpy(dtype=float).reshape(-1, 1)
-        y_active = active["归一化保留时间"].to_numpy(dtype=float)
-        model.fit(x_active, y_active)
-        residual = np.abs(y_active - model.predict(x_active))
-        new_active = active.loc[residual <= config.rt_window_min].copy()
-        if new_active.index.equals(active.index):
-            break
-        if len(new_active) < min_distinct_x:
-            return None
-        active = new_active
-
-    final_model = _base_estimator(fit_type)
-    final_model.fit(
-        active["x碳数"].to_numpy(dtype=float).reshape(-1, 1),
-        active["归一化保留时间"].to_numpy(dtype=float),
-    )
-    return final_model, active
+    return ransac.estimator_, inliers
 
 
 def _with_fit_provenance(record: dict[str, object]) -> dict[str, object]:
-    """Add summary aliases only; Chinese scientific fields remain authoritative.
-
-    IUP can subsequently shift the intercept; its existing IUP offset/original
-    parameter fields describe that validation step, not a second fit strategy.
-    """
-    record["fit_strategy"] = "RANSAC-seeded OLS refit"
+    """Expose the fitted method and preserve the existing summary aliases."""
+    record.setdefault("fit_strategy", None)
+    record.setdefault("fit_point_count", 0)
     for english, legacy in {
         "fit_type": "拟合类型", "r2": "R²",
         "representative_point_count": "代表点数", "inlier_count": "内点数",
@@ -363,43 +365,49 @@ def _with_fit_provenance(record: dict[str, object]) -> dict[str, object]:
 
 
 def _fit_candidate_model(points: pd.DataFrame, fit_type: str, config: RTIUPConfig) -> dict[str, object] | None:
-    result = iterative_refit(points, fit_type, config)
-    if result is None:
+    """Compare two independent fits of the same degree by final recovered points."""
+    raw = _rt_points(points).drop_duplicates()
+    representatives = _median_points_by_x(raw)
+    minimum = _minimum_fit_points(fit_type, config)
+    if len(representatives) < minimum:
         return None
-    model, inlier_points = result
-    x = inlier_points["x碳数"].to_numpy(dtype=float).reshape(-1, 1)
-    y = inlier_points["归一化保留时间"].to_numpy(dtype=float)
-    pred = model.predict(x)
-    r2 = float(r2_score(y, pred))
-    params = _direct_model_params(model, fit_type)
-    x_min = float(np.min(x))
-    x_max = float(np.max(x))
-    if not math.isfinite(r2) or r2 < config.r2_threshold:
-        return None
-    if not _is_positive_monotonic(fit_type, params, x_min, x_max, config):
-        return None
-    if fit_type == "Quadratic" and _has_clear_decreasing_tail(inlier_points, config):
-        return None
-
-    return _with_fit_provenance({
-        "拟合类型": fit_type,
-        "参数": params,
-        "R²": r2,
-        "代表点数": int(len(_median_points_by_x(points))),
-        "内点数": int(len(inlier_points)),
-        "x最小": x_min,
-        "x最大": x_max,
-    })
+    x_all, y_all = _fit_coordinates(raw)
+    candidates = []
+    for strategy, fit in (("IOLS", _fit_iols), ("RANSAC", _fit_ransac)):
+        result = fit(representatives, fit_type, config)
+        if result is None:
+            continue
+        model, fitted = result
+        x, y = _fit_coordinates(fitted)
+        params = _direct_model_params(model, fit_type)
+        r2 = float(r2_score(y, model.predict(x)))
+        if not _accepted_r2(r2, fit_type, params, x, config):
+            continue
+        predicted = predict_values(fit_type, params, x_all[:, 0])
+        recovered = np.abs(y_all - predicted) <= config.rt_window_min
+        if np.unique(x_all[recovered]).size < minimum:
+            continue
+        candidates.append(_with_fit_provenance({
+            "拟合类型": fit_type,
+            "参数": params,
+            "R²": r2,
+            "代表点数": len(representatives),
+            "内点数": int(recovered.sum()),
+            "x最小": float(x.min()),
+            "x最大": float(x.max()),
+            "fit_strategy": strategy,
+            "fit_point_count": len(fitted),
+        }))
+    return max(candidates, key=lambda fit: (fit["内点数"], fit["R²"]), default=None)
 
 
 def fit_line(group: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> dict[str, object]:
-    """Linear-first RANSAC-seeded OLS; evaluate quadratic only if linear fails."""
+    """Evaluate quadratic fits only if neither independent linear fit qualifies."""
 
     plot_group = str(group["细类"].iloc[0])
     line_unsat = float(group["曲线不饱和度"].iloc[0])
     raw_points = (
-        group[["x碳数", "归一化保留时间"]]
-        .dropna()
+        _rt_points(group)
         .drop_duplicates()
         .sort_values(["x碳数", "归一化保留时间"])
         .reset_index(drop=True)
@@ -422,13 +430,14 @@ def fit_line(group: pd.DataFrame, config: RTIUPConfig = RTIUPConfig()) -> dict[s
         "是否有效曲线": False,
         "去除原因": "",
     }
-    if len(fit_points) < 3:
-        base["失败原因"] = "少于3个点"
+    linear_minimum = _minimum_fit_points("Linear", config)
+    if len(fit_points) < linear_minimum:
+        base["失败原因"] = f"少于{linear_minimum}个点"
         return _with_fit_provenance(base)
 
-    best = _fit_candidate_model(fit_points, "Linear", config)
-    if best is None and len(fit_points) >= config.quadratic_min_distinct_x:
-        best = _fit_candidate_model(fit_points, "Quadratic", config)
+    best = _fit_candidate_model(raw_points, "Linear", config)
+    if best is None and len(fit_points) >= _minimum_fit_points("Quadratic", config):
+        best = _fit_candidate_model(raw_points, "Quadratic", config)
     if best is None:
         base["失败原因"] = "未达到R²或单调ECN要求"
         return _with_fit_provenance(base)
@@ -771,7 +780,7 @@ def generate_iup_line_candidates(
                 ).reset_index(drop=True)
                 branch_candidate = _fit_candidate_model(branch, "Linear", config)
                 if branch_candidate is not None:
-                    append_candidate(branch_candidate, "逐碳数分支穷举RANSAC", True)
+                    append_candidate(branch_candidate, "逐碳数分支穷举", True)
 
         x_all = raw_points["x碳数"].to_numpy(dtype=float).reshape(-1, 1)
         y_all = raw_points["归一化保留时间"].to_numpy(dtype=float)
@@ -787,7 +796,7 @@ def generate_iup_line_candidates(
             sampled = pd.DataFrame(sampled_rows).reset_index(drop=True)
             sampled_candidate = _fit_candidate_model(sampled, "Linear", config)
             if sampled_candidate is not None:
-                append_candidate(sampled_candidate, "逐碳数分支抽样RANSAC", True)
+                append_candidate(sampled_candidate, "逐碳数分支抽样", True)
 
             ransac = RANSACRegressor(
                 estimator=LinearRegression(),
@@ -1444,10 +1453,7 @@ def _numeric_series(frame: pd.DataFrame, column: str, default: float) -> pd.Seri
 
 
 def _fit_rescue_candidate(points: pd.DataFrame, fit_type: str, config: RTIUPConfig) -> dict[str, object] | None:
-    # Rescue candidates receive the same RANSAC -> iterative inlier removal ->
-    # final refit treatment as ordinary curves. Requiring every bracket-picked
-    # point to lie on one initial OLS curve was too brittle and could discard an
-    # otherwise coherent alternative because of a single local candidate.
+    # Use the same two fits for bracket-picked points as for the initial series.
     candidate = _fit_candidate_model(points, fit_type, config)
     if candidate is None:
         return None
@@ -1690,10 +1696,10 @@ def fit_ecn(
 ) -> RTIUPResult:
     """Fit ECN curves first, using carbon-median representatives.
 
-    Curve parameters are estimated from median RT values at distinct carbon
-    numbers. The final ±RT-window decision is then applied to every original
-    row. Every curve is judged independently: cross-unsaturation parallelism
-    is recorded for audit only and never removes an ECN curve.
+    Both fitters use median RT values at distinct carbon numbers. Their
+    accepted fits are compared by the number of distinct carbon/RT points
+    recovered from the input. The selected curve is then applied to every row.
+    Cross-unsaturation parallelism is recorded for audit only.
     """
 
     required = {"细类", "曲线不饱和度", "x碳数", "归一化保留时间"}
@@ -1714,6 +1720,7 @@ def fit_ecn(
     line_key_columns = [
         "细类", "不饱和度", "拟合成功", "拟合类型", "参数", "R²", "点数",
         "不同碳数", "代表点数", "内点数", "x最小", "x最大", "是否有效曲线",
+        "fit_strategy", "fit_point_count",
         "去除原因", "平行性是否通过", "平行性参考曲线", "斜率绝对差",
         "斜率相对差", "平行性说明",
     ]
@@ -1747,7 +1754,7 @@ def fit_ecn(
     rows["保留原因"] = np.where(
         rows["点数不足保留"],
         "点数不足但ECN未见明确下降，保留",
-        np.where(rows["同曲线0.2min内点"], "ECN拟合通过且在0.2min内", ""),
+        np.where(rows["同曲线0.2min内点"], f"ECN拟合通过且在{config.rt_window_min:g}min内", ""),
     )
     final_rows = rows[rows["最终保留"]].copy()
 
@@ -1844,6 +1851,8 @@ def fit_rt_iup(
         "R²",
         "点数",
         "内点数",
+        "fit_strategy",
+        "fit_point_count",
         "x最小",
         "x最大",
         "是否有效曲线",

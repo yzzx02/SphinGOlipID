@@ -117,6 +117,49 @@ def test_text_cli_rejects_old_backend_flags(tmp_path,flag):
     assert error.value.code==2
 
 
+@pytest.mark.parametrize('module,input_flag',[('cli','--input-dir'),('targeted_mzml_pipeline','--data-dir')])
+def test_batch_cli_rejects_combining_da_and_ppm(module,input_flag,tmp_path,capsys):
+    main = importlib.import_module(f'sphingolipid_toolkit.{module}').main
+    with pytest.raises(SystemExit) as error:
+        main([input_flag, str(tmp_path), '--output-dir', str(tmp_path/'out'),
+              '--fragment-ppm', '20', '--fragment-da', '0.01'])
+    assert error.value.code == 2
+    assert '--fragment-da' in capsys.readouterr().err
+    assert not (tmp_path/'out').exists()
+
+
+def test_text_cli_keeps_current_intermediate_and_preserves_scan_id(current_inputs,tmp_path):
+    from sphingolipid_toolkit.cli import main
+
+    raw, bank = current_inputs
+    spectra = raw/'hilic-msms-1.txt'
+    spectra.write_text(spectra.read_text(encoding='utf-8').replace('index:1', 'index:0001'), encoding='utf-8')
+    output = tmp_path/'out'
+    assert main(['--input-dir', str(raw), '--output-dir', str(output), '--files', '1',
+                 '--ms2-library', str(bank), '--fragment-da', '.01', '--keep-intermediate']) == 0
+    fragments = pd.read_csv(output/'intermediate'/'parsed_ms2-1.csv', dtype={'scan_id': str})
+    assert fragments.scan_id.tolist() == ['0001']
+    assert fragments.fragment_mz.tolist() == [264.2686]
+    aggregate = pd.read_excel(output/'ms2_annotation_results.xlsx', dtype={'scan_id': str})
+    assert aggregate.scan_id.tolist() == ['0001']
+    assert aggregate.total_score.tolist() == [60.]
+    assert aggregate.ms2_tolerance_da.tolist() == [.01]
+
+
+def test_direct_cli_cannot_overwrite_selected_library(tmp_path,capsys):
+    from sphingolipid_toolkit.identify_cli import main
+
+    source = tmp_path/'input.mzML'
+    source.touch()
+    custom_library = tmp_path/'library.xlsx'
+    custom_library.write_bytes(b'library payload')
+    with pytest.raises(SystemExit) as error:
+        main([str(source), '--output', str(custom_library), '--library', str(custom_library)])
+    assert error.value.code == 2
+    assert 'overwrite' in capsys.readouterr().err
+    assert custom_library.read_bytes() == b'library payload'
+
+
 def test_aggregate_preserves_external_evidence_paths_in_subfolders(tmp_path):
     import logging
     from sphingolipid_toolkit.ms2_pipeline import _write_batch_result

@@ -12,7 +12,7 @@ This workflow is for targeted Agilent mzML MS2 data where one MS1 feature may ha
 6. Preserve both RT values:
    - `ms1_rt`: unified feature RT from targetlist.
    - `ms2_rt`: actual MS2 spectrum RT from mzML.
-7. Use all top 1-3 candidates in RT fitting, then remove only RANSAC-excluded outliers.
+7. Use all top 1-3 candidates in ECN fitting, then remove fitted outliers beyond the RT window.
 8. Keep rows from series with too few points for fitting as `not_evaluated`.
 
 ## Command
@@ -38,6 +38,7 @@ Optional:
 --mzml-dir        Override where mzML files are searched.
 --ms1-ppm         MS1 library candidate tolerance in ppm.
 --feature-ppm     mzML precursor to targetlist feature tolerance in ppm.
+--rt-window-min   Absolute RT residual window in minutes (default 0.20).
 ```
 
 ## Outputs
@@ -66,7 +67,7 @@ For strict 10 ppm matching, use all three ppm parameters together:
 
 ## RT Fitting
 
-RT fitting is a post-processing filter. Series with too few points, unparsed lipid series, or RANSAC fitting failures are kept as `not_evaluated`; only rows classified as fitted outliers are removed from `targeted_mzml_rt_fitted_identifications.xlsx`.
+RT fitting is a post-processing filter. Independent IOLS and RANSAC fits use the shared ECN selection rules. The RT window sets the initial RANSAC consensus and final inlier recovery for both methods. Series without a qualifying model are kept as `not_evaluated`. Only rows outside the selected model's window are removed from `targeted_mzml_rt_fitted_identifications.xlsx`.
 
 ## Notes
 

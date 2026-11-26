@@ -1,5 +1,8 @@
 # GUI construction plan for SphinGOlipID
 
+This is the historical feature plan. The current Tkinter desktop GUI is
+implemented; see [GUI_GUIDE.md](GUI_GUIDE.md) for its actual workflow and scope.
+
 ## 1. Recommended technology route
 
 For the first usable version, build the GUI with **Streamlit** or **PySide6**:

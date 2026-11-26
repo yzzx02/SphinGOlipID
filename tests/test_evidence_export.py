@@ -141,3 +141,24 @@ def test_failed_multisheet_export_keeps_previous_output_and_cleans_artifacts(tmp
         result_writer.write_identification_workbook({'annotations':pd.DataFrame({'ms2_evidence_json':['x'*40000]})},path)
     assert path.read_bytes()==b'previous result'
     assert list(tmp_path.iterdir())==[path]
+
+
+def test_export_keeps_duplicate_index_evidence_rows_and_literal_filenames(tmp_path):
+    evidence = json.dumps({"source": "x" * 40000})
+    data = pd.DataFrame({"source_file": ["=样本.mzML", "normal.mzML"],
+                         "ms2_evidence_json": [evidence, "{}"],
+                         "total_score": [82.125, 75.5], "result_rank": [1, 2]}, index=[7, 7])
+    path = tmp_path / "result.XLSX"
+    result_writer.write_identification_workbook({"annotations": data, "spectrum_matches": data}, path)
+
+    for sheet in ("annotations", "spectrum_matches"):
+        exported = pd.read_excel(path, sheet_name=sheet)
+        assert exported.source_file.tolist() == data.source_file.tolist()
+        assert exported.total_score.tolist() == data.total_score.tolist()
+        assert exported.result_rank.tolist() == data.result_rank.tolist()
+        assert exported.ms2_evidence_json.iloc[1] == "{}"
+        assert pd.isna(exported.evidence_file.iloc[1])
+        sidecar = path.parent / exported.evidence_file.iloc[0]
+        with gzip.open(sidecar, "rt", encoding="utf-8") as handle:
+            assert json.load(handle)[exported.evidence_sha256.iloc[0]] == evidence
+    assert data.ms2_evidence_json.tolist() == [evidence, "{}"]

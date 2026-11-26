@@ -1,7 +1,7 @@
 """XCMS local MS1 features linked to the unchanged current MS2 identifier."""
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from importlib.resources import files
 import json
 import logging
@@ -15,7 +15,8 @@ from tempfile import TemporaryDirectory
 import numpy as np
 import pandas as pd
 
-from .engine import IdentificationConfig, SphingolipidIdentifier, compatible_frame, library_path
+from .engine import ENGINE_REVISION, IdentificationConfig, SphingolipidIdentifier, compatible_frame, library_path
+from .io_utils import protected_library_paths
 from .reference_pipeline import iter_prepared_mzml
 from .result_writer import write_identification_workbook
 
@@ -36,6 +37,7 @@ class UntargetedConfig:
     snthresh: float = 3.0
     save_intermediate: bool = False
     rscript_path: Path | None = None
+    acidic_weights: dict[str, tuple[float, ...]] = field(default_factory=dict)
 
     def __post_init__(self):
         object.__setattr__(self, "mzml_files", tuple(Path(p).resolve() for p in self.mzml_files))
@@ -65,7 +67,7 @@ class UntargetedConfig:
     def identification_config(self):
         return IdentificationConfig(precursor_ppm=self.precursor_ppm,
             fragment_ppm=self.fragment_ppm, fragment_da=self.fragment_da,
-            min_total_score=self.min_total_score, top_n=self.top_n)
+            min_total_score=self.min_total_score, top_n=self.top_n, acidic_weights=self.acidic_weights)
 
 
 def find_rscript(selected: Path | None = None) -> Path:
@@ -141,8 +143,10 @@ def normalize_xcms_features(frame: pd.DataFrame, path: Path, polarity: str) -> p
     required = frame[["feature_mz", "mz_min", "mz_max", "xcms_rt_min", "rt_min", "rt_max", "peak_area", "xcms_peak_height"]]
     if not np.isfinite(required.to_numpy()).all():
         raise ValueError("XCMS 返回非有限的峰测量值。")
+    # centWave can report its nominal RT outside the integrated interval.
+    # Preserve it for audit and measure the actual apex within the peak bounds.
     if ((frame.mz_min > frame.feature_mz) | (frame.feature_mz > frame.mz_max) |
-        (frame.rt_min > frame.xcms_rt_min) | (frame.xcms_rt_min > frame.rt_max) |
+        (frame.rt_min > frame.rt_max) |
         (frame.mz_min <= 0) | (frame.rt_min < 0) | (frame.peak_area < 0) | (frame.xcms_peak_height < 0)).any():
         raise ValueError("XCMS 返回无效的峰边界或强度。")
     for name in ("xcms_rt_min", "rt_min", "rt_max"):
@@ -243,15 +247,16 @@ def run_untargeted(config: UntargetedConfig, logger=None) -> Path:
             raise FileNotFoundError(f"mzML 文件不存在：{path}")
     if config.output_file.exists() and not config.output_file.is_file():
         raise ValueError("输出位置须为 XLSX 文件。")
-    protected = [library_path("+"), library_path("-")]
-    if config.output_file in protected:
+    if config.output_file in protected_library_paths(config):
         raise ValueError("输出不能覆盖独立鉴定库。")
+    library_path(config.polarity)
     find_rscript(config.rscript_path)
     config.output_file.parent.mkdir(parents=True, exist_ok=True)
     frames, all_rows, input_metadata, audits = [], [], [], []
+    identification = config.identification_config()
     logger.info("Validating inputs: %s mzML files, no target table", len(config.mzml_files))
     with TemporaryDirectory(prefix=".sphingolipid_xcms_", dir=config.output_file.parent) as temporary:
-        with SphingolipidIdentifier(config.identification_config()) as identifier:
+        with SphingolipidIdentifier(identification) as identifier:
             for number, path in enumerate(config.mzml_files, 1):
                 work = Path(temporary) / str(number)
                 features, versions = run_xcms(path, config, work, logger)
@@ -260,34 +265,38 @@ def run_untargeted(config: UntargetedConfig, logger=None) -> Path:
                 features["qualified_ms2_count"] = 0
                 features["identified_ms2_count"] = 0
                 logger.info("Matching acquired MS2: %s", path.name)
-                if not features.empty:
-                    for spectrum in iter_prepared_mzml(path):
-                        if spectrum.polarity != config.polarity:
-                            continue
-                        index = match_local_feature(features, spectrum, config.precursor_ppm)
-                        refinement = spectrum.metadata.get("precursor_refinement", {})
-                        audit = dict(source_file=path.name, source_path=str(path),
-                            native_scan_id=spectrum.metadata.get("native_scan_id", ""),
-                            ms2_rt_min=spectrum.rt_minutes, precursor_mz=spectrum.precursor_mz,
-                            precursor_mz_raw=refinement.get("raw_mz"),
-                            preceding_ms1_native_id=refinement.get("ms1_native_id"),
-                            ms1_status=refinement.get("status"), xcms_peak_id=None,
-                            association_status="no_unique_local_peak" if refinement.get("status") == "confirmed" else "no_confirmed_ms1",
-                            passing_candidate_count=0)
-                        audits.append(audit)
-                        if index is None:
-                            continue
-                        audit.update(xcms_peak_id=features.loc[index, "xcms_peak_id"], association_status="linked")
-                        features.loc[index, "qualified_ms2_count"] += 1
-                        rows = identifier.score_spectrum(spectrum)
-                        audit["passing_candidate_count"] = len(rows)
-                        if rows:
-                            features.loc[index, "identified_ms2_count"] += 1
+                for spectrum in iter_prepared_mzml(path, identification.min_relative_intensity):
+                    if spectrum.polarity != config.polarity:
+                        continue
+                    refinement = spectrum.metadata.get("precursor_refinement", {})
+                    index = None if features.empty else match_local_feature(features, spectrum, config.precursor_ppm)
+                    if refinement.get("status") != "confirmed":
+                        association = "no_confirmed_ms1"
+                    elif features.empty:
+                        association = "no_local_features"
+                    else:
+                        association = "no_unique_local_peak"
+                    audit = dict(source_file=path.name, source_path=str(path), polarity=spectrum.polarity,
+                        native_scan_id=spectrum.metadata.get("native_scan_id", ""),
+                        ms2_rt_min=spectrum.rt_minutes, precursor_mz=spectrum.precursor_mz,
+                        precursor_mz_raw=refinement.get("raw_mz"),
+                        preceding_ms1_native_id=refinement.get("ms1_native_id"),
+                        ms1_status=refinement.get("status"), xcms_peak_id=None,
+                        association_status=association, passing_candidate_count=0)
+                    audits.append(audit)
+                    if index is None:
+                        continue
+                    audit.update(xcms_peak_id=features.loc[index, "xcms_peak_id"], association_status="linked")
+                    features.loc[index, "qualified_ms2_count"] += 1
+                    rows = identifier.score_spectrum(spectrum)
+                    audit["passing_candidate_count"] = len(rows)
+                    if rows:
+                        features.loc[index, "identified_ms2_count"] += 1
+                        feature_data = features.loc[index].drop(labels=["qualified_ms2_count", "identified_ms2_count"]).to_dict()
                         for row in rows:
-                            row.update(features.loc[index].drop(labels=["qualified_ms2_count", "identified_ms2_count"]).to_dict())
-                            row.update(native_scan_id=spectrum.metadata.get("native_scan_id", ""),
+                            row.update(feature_data, native_scan_id=spectrum.metadata.get("native_scan_id", ""),
                                 collision_energy=spectrum.metadata.get("collision_energy"))
-                        all_rows.extend(rows)
+                    all_rows.extend(rows)
                 features["annotation_status"] = np.where(features.identified_ms2_count > 0, "identified",
                     np.where(features.qualified_ms2_count > 0, "no_passing_ms2_candidate", "no_qualified_local_ms2"))
                 frames.append(features)
@@ -310,7 +319,8 @@ def run_untargeted(config: UntargetedConfig, logger=None) -> Path:
     settings = {key: str(value) if isinstance(value, Path) else json.dumps(value, default=str) if isinstance(value, tuple) else value
                 for key, value in asdict(config).items()}
     from . import __version__
-    settings.update(application="SphinGOlipID", version=__version__, feature_detection="XCMS centWave",
+    settings.update(application="SphinGOlipID", version=__version__, engine_revision=ENGINE_REVISION,
+        min_relative_intensity=identification.min_relative_intensity, feature_detection="XCMS centWave",
         rt_units="minutes (peakwidth is seconds)", feature_grouping="per file; no alignment or gap filling",
         xcms_prefilter_scans=3, xcms_prefilter_intensity=config.noise, xcms_workers=1,
         xcms_mzdiff=-0.001, xcms_mz_center_fun="wMean", xcms_integrate=1, xcms_fitgauss=False,
@@ -321,7 +331,7 @@ def run_untargeted(config: UntargetedConfig, logger=None) -> Path:
     logger.info("Exporting results: %s", config.output_file)
     write_identification_workbook({"annotations": annotations, "features": features,
         "spectrum_matches": matches, "spectrum_audit": pd.DataFrame(audits, columns=[
-            "source_file", "source_path", "native_scan_id", "ms2_rt_min", "precursor_mz", "precursor_mz_raw",
+            "source_file", "source_path", "polarity", "native_scan_id", "ms2_rt_min", "precursor_mz", "precursor_mz_raw",
             "preceding_ms1_native_id", "ms1_status", "xcms_peak_id", "association_status", "passing_candidate_count"]),
         "parameters": pd.DataFrame(settings.items(), columns=["parameter", "value"]),
         "input_files": pd.DataFrame(input_metadata)}, config.output_file)

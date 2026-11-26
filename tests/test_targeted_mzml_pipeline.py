@@ -86,3 +86,16 @@ def test_rt_fit_filter_keeps_not_evaluated_rows():
 
     assert len(filtered) == 2
     assert set(filtered["rt_validation_status"]) == {"not_evaluated"}
+
+
+def test_targeted_rt_fit_reuses_ecn_window_and_keeps_unevaluated_channels():
+    data = pd.DataFrame({
+        "lipid_name": [f"Cer(d18:1/{carbon}:0)" for carbon in (16, 18, 20, 20, 20, 22, 24, 16)],
+        "adduct": ["[M+H]+"] * 7 + ["[M+Na]+"],
+        "ms1_rt": [8, 9, 9.85, 10, 10.7, 11, 12, 30],
+    })
+    config = TargetedMzMLConfig(data_dir=Path("."), ms1_library_path=None, output_dir=Path("out"))
+    filtered = apply_rt_fit_filter(data, config)
+    assert 9.85 in filtered["ms1_rt"].values and 10.7 not in filtered["ms1_rt"].values
+    assert set(filtered.loc[filtered["adduct"].eq("[M+H]+"), "rt_fit_strategy"]) <= {"IOLS", "RANSAC"}
+    assert filtered.iloc[-1]["rt_validation_status"] == "not_evaluated"
