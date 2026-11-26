@@ -7,7 +7,17 @@ a LipidGate installation, pyOpenMS or a Qt application.
 
 ## Install
 
+Install the wheel from the [GitHub release](https://github.com/yzzx02/SphinGOlipID/releases/tag/v1.0.0). It includes both reference libraries:
+
 ```powershell
+python -m pip install ./sphingolipid_toolkit-1.0.0-py3-none-any.whl
+sphingolipid-gui
+```
+
+To install from a Git checkout, switch to the release tag before installing:
+
+```powershell
+git switch --detach v1.0.0
 git lfs pull
 python -m pip install -e .
 ```
@@ -15,6 +25,24 @@ python -m pip install -e .
 Python 3.10 or later is required. Compressed MSP files, SQLite indexes and the
 historical reference-name catalog are tracked by Git LFS and bundled in the
 package. An incomplete or fingerprint-mismatched bundled index is rejected.
+
+The positive library distinguishes diagnostic glycan ions from auxiliary
+glycosidic fragments. Auxiliary fragments contribute to Other above 0.5% of
+the original base peak. GM2 and GM3 use HG/LCB/Other weights of 60/20/20.
+For these two positive classes, admission requires at least half the precursor's
+core HG channels (four of eight in the bundled library). Count distinct matched
+peaks across Y/Z and B together. Chain resolution additionally requires a
+composition-specific LCB water-loss peak at or above 1% of the base peak.
+GM2(36:1;O2) also has a singly ammoniated sum-composition entry. GM1, GD1,
+GT1 and GD3 use HG/LCB/Other weights of 60/20/20. Their Y/Z and B ions
+retain separate admission requirements and share the HG score. The strongest
+diagnostic headgroup peak and the strongest eligible LCB dehydration peak
+supply the HG and LCB scores, respectively.
+GD2, Gal-Fuc-GM1, Gal-Fuc-GD1 and the 32 glycan-composition families also
+use HG/LCB/Other at 60/20/20. Diagnostic glycan fragments score in HG.
+A sum-composition entry without an LCB product receives zero LCB points.
+The scoring revision and the inherited library checksums are recorded in
+`config/scientific_revision_glycan_hg_lcb_20261125.json`.
 
 The non-targeted desktop workflow also requires R with `xcms`, `MSnbase`,
 `mzR`, `jsonlite` and `BiocParallel`. Add `Rscript` to PATH; Windows installations
@@ -97,6 +125,13 @@ The source's candidate ordering, scores, matched-count Top1 split and full
 evidence provenance are retained. See
 [migration and scientific coverage](docs/LIPIDGATE_ENGINE_MIGRATION.md).
 
+Protonated Lyso-SM, SM, Cer1P and Gb4 allocate 60 points to headgroup evidence,
+20 to long-chain-base evidence and 20 to supporting fragments. Protonated
+CAEP and PG-Cer entries with a curated chain composition require both
+subclass evidence and an independent product of the specified base. Their
+sum-composition entries use HG/Other (60/40). Positive SL retains its FAH
+pool for acyl-related products.
+
 ## Python API
 
 ```python
@@ -133,6 +168,15 @@ result), `spectrum_audit` (local-association decisions), `parameters` and
 `input_files` (actual R/XCMS versions and source paths). Scores, gates, native
 scan IDs, ranking and full MS2 evidence remain unchanged. Keep adjacent
 `ms2-evidence-*.json.gz` files with the workbook; GUI Save As copies the bundle.
+The desktop results tab opens `annotations` by default and can preview each
+worksheet. Search and score filters apply to the whole selected sheet.
+**ECN Review & Export** offers optional retention-time fitting and an Excel
+annotation table with one measured peak-area column per sample. IOLS and RANSAC
+fit independently. The adjustable window (default ±0.20 min) sets the initial
+RANSAC consensus and the final recovery for both methods. Among increasing fits
+with R² ≥ 0.99, ECN selects the linear model with the most recovered points, or
+compares quadratic fits if neither linear fit qualifies. See the
+[desktop guide](docs/GUI_GUIDE.md) for review and export details.
 
 The historical 85,710-row MS1 list is a type/name crosswalk, not a library-size
 target or an identification candidate grid. Current eligible chain combinations
@@ -174,3 +218,9 @@ trimethylSo's intrinsic [M]+ ion; these remain reference-only, without a direct
 GM1 alias or a permissive single-amine gate. No other rare-type grid is added.
 Existing classes retain their fragments, evidence rules, scores and ranking.
 The local scientific revision is separate from the immutable migration manifest.
+
+The 2026-11-15 positive chain rule admits explicitly curated LCBs with up to
+three double bonds at any carbon length. The packaged library includes the
+protonated Lyso-sulfo(d22:3) candidate as SHexSPB(d22:3). Identification requires
+both the sulfate-loss and sulfated-hexose-loss products in the same MS/MS scan.
+See [the scientific checkpoint](config/scientific_revision_lcb_triene_20261115.json).

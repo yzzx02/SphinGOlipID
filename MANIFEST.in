@@ -1,0 +1,7 @@
+include CHANGELOG.md requirements.txt
+recursive-include config *.json *.csv
+include scripts/build_sphingolipid_library.py scripts/build_sphingolipid_name_catalog.py
+include scripts/build_headgroup_library.py scripts/build_lcb_triene_revision.py scripts/build_structural_pool_library.py
+include scripts/curate_positive_*.py scripts/extend_positive_*.py scripts/extend_verified_modified_sphingoid_library.py
+recursive-include tests *.py *.txt *.xlsx *.mzML *.md
+recursive-include docs *.md

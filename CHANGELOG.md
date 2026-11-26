@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.0 — 2026-11-26
+
+- Review measured peaks, MS/MS spectra and ECN fits from the desktop results tab. Export an annotation table with a measured peak area for each sample.
+- Fit IOLS and RANSAC independently. Select the qualifying linear model with the most recovered inliers before evaluating quadratic fits. The adjustable absolute RT window defaults to 0.20 min.
+- Update positive-mode fragment pools and the curated chain references. The bundled indexes contain 753,564 positive and 348,895 negative records.
+- Preserve boolean and unjudged IUP results when using pandas 3.
+
+## 0.6.3 — 2026-11-24
+
+- Admit positive GM2 and GM3 when independent peaks match at least half of the combined core HG pool. Chain-level reporting requires the composition-dependent LCB evidence.
+
+## 0.6.2 — 2026-11-24
+
+- Limit each positive precursor to eight core HG channels, retain auxiliary products in Other, and add the sum-composition ammonium entry for GM2(36:1;O2).
+
+## 0.6.1 — 2026-11-15
+
+- Allow positive LCB compositions with up to three double bonds at any carbon
+  length. Restore the previously curated SL triene records that meet the current
+  acyl limits and include the explicit SHexSPB(d22:3) library candidate.
+
 ## 0.6.0 — 2026-11-10
 
 - Retain the existing desktop layout and replace mandatory TXT/target-table

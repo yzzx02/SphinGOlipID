@@ -1,14 +1,16 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "sphingolipid-toolkit"
-version = "0.6.0"
+version = "1.0.0"
 description = "SphinGOlipID sphingolipid identification with fragment-pool evidence gates"
+readme = "README.md"
+license-files = ["licenses/LipidGate-MIT.txt"]
 requires-python = ">=3.10"
 dependencies = [
-  "pymzml>=2.5",
+    "pymzml>=2.5",
     "numpy>=1.23",
     "pandas>=1.5",
     "openpyxl>=3.1",
@@ -26,8 +28,9 @@ sphingolipid-targeted-mzml = "sphingolipid_toolkit.targeted_mzml_pipeline:main"
 sphingolipid-gui = "sphingolipid_toolkit.gui:main"
 sphingolipid-untargeted = "sphingolipid_toolkit.untargeted_cli:main"
 
-[tool.setuptools]
-license-files = ["licenses/LipidGate-MIT.txt"]
+[project.urls]
+Repository = "https://github.com/yzzx02/SphinGOlipID"
+Issues = "https://github.com/yzzx02/SphinGOlipID/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
