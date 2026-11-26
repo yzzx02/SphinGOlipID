@@ -55,9 +55,9 @@ def load_annotation_source(path: Path) -> AnnotationSource:
         if not {'annotations', 'input_files'} <= set(workbook.sheet_names):
             raise ValueError('请选择包含 annotations 和 input_files 的非靶向结果工作簿。')
         options = dict(keep_default_na=False, na_values=[''])
-        annotations = workbook.parse('annotations', dtype=SCAN_ID_DTYPES, **options)
-        samples = workbook.parse('input_files', usecols=['source_file', 'source_path'], **options)
-        settings = workbook.parse('parameters', **options) if 'parameters' in workbook.sheet_names else None
+        annotations = pd.read_excel(workbook, sheet_name='annotations', dtype=SCAN_ID_DTYPES, **options)
+        samples = pd.read_excel(workbook, sheet_name='input_files', usecols=['source_file', 'source_path'], **options)
+        settings = pd.read_excel(workbook, sheet_name='parameters', **options) if 'parameters' in workbook.sheet_names else None
     if workbook_stamp(path) != stamp:
         raise ValueError('来源工作簿正在更新，请重新打开。')
     missing = set(ANNOTATION_FIELDS) - set(annotations)

@@ -494,7 +494,7 @@ def _read_legacy_or_normalized_ms1_library(path: str | Path) -> pd.DataFrame:
         return _read_masshunter_compound_csv(path)
 
     with pd.ExcelFile(path) as xls:
-        frames = [xls.parse(sheet) for sheet in xls.sheet_names]
+        frames = [pd.read_excel(xls, sheet_name=sheet) for sheet in xls.sheet_names]
     if set(MS1_LIBRARY_REQUIRED_COLUMNS).issubset(frames[0].columns):
         return read_ms1_library(path)
     data = pd.concat(frames, ignore_index=True)

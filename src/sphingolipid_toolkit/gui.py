@@ -731,7 +731,7 @@ class SphinGOlipIDApp:
                     headers = next(rows, ())
                     frame = pd.DataFrame(rows, columns=headers, dtype=object)
                 else:
-                    frame = workbook.parse(sheet, dtype=SCAN_ID_DTYPES, keep_default_na=False, na_values=[""])
+                    frame = pd.read_excel(workbook, sheet_name=sheet, dtype=SCAN_ID_DTYPES, keep_default_na=False, na_values=[""])
             frame.columns = frame.columns.map(str)
             annotations = sheet in {"annotations", "spectrum_matches"} or any(col in frame for col in NAME_COLUMNS)
             if annotations:

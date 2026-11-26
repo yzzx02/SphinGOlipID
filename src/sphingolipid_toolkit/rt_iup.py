@@ -1252,7 +1252,8 @@ def apply_point_level_iup_guard(
     guarded = rows.copy()
     guarded["拟合点IUP支持数"] = np.nan
     guarded["拟合点IUP判断数"] = np.nan
-    guarded["点级IUP是否通过"] = ""
+    # Exports use a blank for unjudged points and booleans for judged points.
+    guarded["点级IUP是否通过"] = pd.Series("", index=guarded.index, dtype=object)
     guarded["点级IUP说明"] = ""
     guarded["点级IUP过滤原因"] = ""
 
@@ -1901,11 +1902,12 @@ def fit_rt_iup(
     if keep_short_series:
         rows["点数不足保留"] = rows["拟合成功"].eq(False) & rows["点数"].between(1, 2, inclusive="both")
 
-    rows["IUP说明"] = np.where(rows["同曲线0.2min内点"], "有效拟合曲线，0.2min内点", "")
+    inlier_note = f"有效拟合曲线，{config.rt_window_min:g}min内点"
+    rows["IUP说明"] = np.where(rows["同曲线0.2min内点"], inlier_note, "")
     rows = apply_rescue_point_guard(rows, lines, "同曲线0.2min内点", "IUP说明", config)
     rows["是否作图"] = rows["同曲线0.2min内点"]
     normal_mask = rows["是否作图"].eq(True) & ~rows.get("二次捞点", pd.Series(False, index=rows.index)).map(bool_value)
-    rows.loc[normal_mask, "IUP说明"] = "有效拟合曲线，0.2min内点"
+    rows.loc[normal_mask, "IUP说明"] = inlier_note
     rows = apply_point_level_iup_guard(rows, lines, config)
 
     if keep_short_series:
@@ -1937,7 +1939,7 @@ def fit_rt_iup(
         np.where(
             rows["同曲线0.2min内点"] & rows.get("二次捞点", pd.Series(False, index=rows.index)).map(bool_value),
             "二次IUP捞点恢复",
-            np.where(rows["同曲线0.2min内点"], "拟合成功且符合IUP，0.2min内点", ""),
+            np.where(rows["同曲线0.2min内点"], f"拟合成功且符合IUP，{config.rt_window_min:g}min内点", ""),
         ),
     )
     final_rows = rows[rows["最终保留"]].copy()

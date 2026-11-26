@@ -44,6 +44,20 @@ def _sm_d18_1_regression_fixture() -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
+def test_iup_export_uses_selected_window_and_preserves_unjudged_status():
+    from sphingolipid_toolkit.rt_iup import RTIUPConfig, fit_rt_iup
+
+    data = pd.DataFrame({
+        "细类": ["Cer"] * 4, "曲线不饱和度": [0] * 4,
+        "x碳数": [16, 18, 20, 22], "归一化保留时间": [5., 6., 7., 8.],
+    })
+    rows = fit_rt_iup(data, RTIUPConfig(rt_window_min=0.35)).rows
+    assert len(rows) == 4
+    assert rows["点级IUP是否通过"].eq("").all()
+    for column in ("IUP说明", "保留原因"):
+        assert rows[column].str.contains("0.35min", regex=False).all()
+
+
 def test_sm_d18_1_expected_ecn_and_iup_lines():
     from sphingolipid_toolkit.rt_iup import RTIUPConfig, fit_ecn, fit_rt_iup
 
