@@ -1,0 +1,147 @@
+{
+  "revision": "sphingolipid-positive-structural-pools-20261125-r4",
+  "previous_application_revision": "sphingolipid-glycan-hg-lcb-20261125-r3",
+  "imported_snapshot": {
+    "path": "config/engine_revision.json",
+    "sha256": "6046bd7a4bbbd1debd86b8bf059a3931aaccbf74f17a38278be75713b528ae8e"
+  },
+  "evidence_manifest": {
+    "path": "config/positive_structural_chain_evidence_20261126.json",
+    "sha256": "4fd60d0b442612a77c7caae19a378c1b1e8f8fe550e435c7df7468f174b4138b"
+  },
+  "scientific_code_sha256": {
+    "src/sphingolipid_toolkit/acidic_scoring.py": "0628810608bf266e64bfc94a512b1eae1740914f173fb9b1f0cac8645bed097d",
+    "src/sphingolipid_toolkit/engine.py": "90dc0caf7a0731f0b33d8b69de3b98dcd5a13f6017a998b7aaff6d618940e616",
+    "src/sphingolipid_toolkit/_vendor/lipidgate/ms2/search.py": "d6d144ce7a01b8ed426baf7584fb1e45a246b7e29546f021b68ff2fea8dd284a",
+    "src/sphingolipid_toolkit/_vendor/lipidgate/ms2/library.py": "36d816aa8f6d205b0b41c26720da05979c4e2bbb984764b42907bb2b0f4c9ef5",
+    "scripts/build_structural_pool_library.py": "4b7b8d431e6adb49de980b4905679e93cb4b6a968be0cbf08747d13ef1017587"
+  },
+  "library_rules_sha256": "b4e4914bacbef1f99e0789ea3eee04743c106469bb44490be872a5d4d5506bd3",
+  "libraries": {
+    "positive": {
+      "index_sha256": "75c21b4dde2ba7dc2c30655fa0384a2dded22612206ed6e87f6ee79bd38d1b44",
+      "index_bytes": 46727168,
+      "raw_records_freshly_normalized": 745829,
+      "derived_records_freshly_generated": 7735,
+      "preserved_original_records": 753559,
+      "preserved_ids_order_and_all_scientific_fields": false,
+      "matched_expected_scientific_fields": true,
+      "rebuilt_search_plans": true,
+      "blockwise_roundtrip_verified": true,
+      "new_record_ids": [
+        1816777,
+        1816778,
+        1816779,
+        1816780,
+        1816781
+      ],
+      "raw_content_sha256": "442514dd13b51f724d6bf50bc36dd01f960623e44ad3db87ca4c4d7769397d8c",
+      "untouched_blocks_sha256": "6bccb8fe16864f19ae1dfb21ae03906c3562877ac26c8384bf3fa7dd75d18f49",
+      "previous_MSP_sha256": "f6794f32a3fdc0313667396879bb3fa3904d2d6ea3c11111ad822cc7fa5f5298",
+      "block_counts": {
+        "unchanged": 745773,
+        "Lyso-SM modified": 51
+      },
+      "added_names": [
+        "CAEP(d18:2/h25:2)",
+        "CAEP(d18:2/h27:2)",
+        "CAEP(d18:2/h28:2)",
+        "CAEP(d18:3/16:0)",
+        "PG-Cer(d18:2/16:0)"
+      ],
+      "old_index_sha256": "7294e8667385b0e8c8fecf52ce142a1399c4780aad7b593b9221c0931b6969b7",
+      "source_sha256": "ee6fc8eb2167dbcb87ab344142271e77b16fef320893d1b3cfc795b0a8bd5c42",
+      "normalized_records": 753564
+    },
+    "negative": {
+      "index_sha256": "f0bb3205cf9834523a9e936866dad7f66b27058cd46b2c0be7a5244fce35bb3e",
+      "index_bytes": 23515136,
+      "raw_records_freshly_normalized": 348895,
+      "derived_records_freshly_generated": 0,
+      "preserved_original_records": 348895,
+      "preserved_ids_order_and_all_scientific_fields": true,
+      "matched_expected_scientific_fields": true,
+      "rebuilt_search_plans": true,
+      "blockwise_roundtrip_verified": true,
+      "new_record_ids": [],
+      "old_index_sha256": "89c7dbca1abf5a7d768154418db7159513e4ed26319f62b533110b2b5cd1b7c7",
+      "source_sha256": "c05a165449ff9be6b5fc93a05ee619b2c141edde3256181bf5a84c5e58a4d4f9",
+      "normalized_records": 348895
+    }
+  },
+  "positive_pool_assignments": {
+    "HG/LCB/Other 60/20/20": {
+      "protonated": [
+        "Lyso-SM",
+        "Cer1P",
+        "SM",
+        "Gb4",
+        "CAEP (chain)",
+        "PG-Cer (chain)",
+        "HexSPB",
+        "Hex3SPB",
+        "SHexSPB"
+      ],
+      "other_reviewed": [
+        "Hex-IPC",
+        "GD1a [M+2NH4]2+",
+        "GD1b [M+2NH4]2+",
+        "GT1b [M+2NH4]2+",
+        "GQ1b [M+2NH4]2+"
+      ]
+    },
+    "FAH/HG/Other 60/20/20": [
+      "SL [M+H]+",
+      "SL [M+NH4]+"
+    ],
+    "HG/Other 60/40": [
+      "SM [M+Na]+",
+      "Cer1P [M+Na]+",
+      "CAEP (sum)",
+      "PG-Cer (sum)",
+      "N-methylCAEP (sum)"
+    ]
+  },
+  "name_crosswalk": {
+    "source_rows": 85710,
+    "unique_name_formula_rows": 79262,
+    "covered_compositions": 22692,
+    "newly_covered_reference_names": [
+      "CAEP(d43:4)(2OH)",
+      "CAEP(d45:4)(2OH)",
+      "CAEP(d46:4)(2OH)"
+    ],
+    "sha256": "f24cd7d01f7f6382f404cd9100b69bdfff63f54d4b690c79539bf6e1e0c20f0a"
+  },
+  "benchmark": {
+    "query_count": 4556,
+    "reference_count": 440,
+    "input_sha256": "83b2adf34e06ba640c15bed02586657de65cb45ad56ca137e2d0fe3ed168a0b4",
+    "reference_sha256": "edd4ca448e9e126f9b3850b74e33d0b3ddfb95d1500168ebf9baed0128fe4fc8",
+    "current_recall_with_adduct": {
+      "Plasma": 51,
+      "GPST000446 human brain": 70,
+      "Mouse brain": 67,
+      "Porcine GSL (NC 2024)": 86,
+      "Standards": 60
+    },
+    "prior_total": 335,
+    "gains": [],
+    "losses": [
+      [
+        "Mouse brain",
+        [
+          "SM",
+          43,
+          2,
+          2
+        ]
+      ]
+    ]
+  },
+  "scientific_regression": {
+    "test_command": "python -m pytest -q",
+    "passed": 1174,
+    "curated_chain_entries": 5
+  }
+}

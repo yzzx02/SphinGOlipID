@@ -1,0 +1,109 @@
+{
+  "revision": "sphingolipid-sm-protonated-6040-20261121-r1",
+  "package_version": "0.6.1",
+  "previous_revision": "sphingolipid-lcb-triene-20261115-r1",
+  "previous_git_head": "70df49b6fd5ccae771852e2ffbffe2a9a847cdd0",
+  "previous_effective_rules_sha256": "5fc98df77e377888b6caa2fb0ae163d97a9d503d9972386dac76a85f5dc571d2",
+  "effective_rules_sha256": "a769fefccb45202760612e4a742a46af1068d74598155fbd47bc0ac96a9afecb",
+  "immutable_upstream_manifest": "config/engine_revision.json",
+  "changed_vendor_files": {
+    "src/sphingolipid_toolkit/_vendor/lipidgate/ms2/scoring.py": {
+      "before_sha256": "44391503536edd34cd4f886ef9379c1129b681da7abcdbdddcc0b1047cc1d464",
+      "after_sha256": "3d4f58ee9af12cedacc81dbe31e58789ee49392dafc66d0c64ba3dfb1e5d4865"
+    }
+  },
+  "scientific_change": {
+    "compound_class": "SM",
+    "adduct": "[M+H]+",
+    "previous_pool_max_points": {
+      "hg": 75,
+      "other": 25
+    },
+    "pool_max_points": {
+      "hg": 60,
+      "other": 40
+    },
+    "common_display_name_for_pool": "other"
+  },
+  "index_builder": "scripts/extend_verified_modified_sphingoid_library.py rebuild",
+  "libraries": {
+    "positive": {
+      "source_sha256": "2bc814231f447e6b52e84fe8511cc0511cf164c9f74ab4b51365307f2eed23b8",
+      "previous_index_sha256": "7da7b3ac065da45313ffb40396b2e1fe7d4d1fdbdba3e82b26d0856ab546f43b",
+      "index_sha256": "c1623ea074e040e6c348060f1d7c9e5ba3640624a00e0842ddebe23b6144107a",
+      "index_bytes": 46575616,
+      "raw_records_freshly_normalized": 745823,
+      "derived_records_freshly_generated": 7735,
+      "preserved_original_records": 753558,
+      "preserved_ids_order_and_all_scientific_fields": true,
+      "rebuilt_search_plans": true,
+      "blockwise_roundtrip_verified": true
+    },
+    "negative": {
+      "source_sha256": "c05a165449ff9be6b5fc93a05ee619b2c141edde3256181bf5a84c5e58a4d4f9",
+      "previous_index_sha256": "d988b8494078814e021db6f73b9c744e4015cf97eb925278a0bab143fc1b7358",
+      "index_sha256": "d9ac075d1398b30f07c71c382ffd32ac3b52d84aa0cf07d9831ae002f11bfcbd",
+      "index_bytes": 23515136,
+      "raw_records_freshly_normalized": 348895,
+      "derived_records_freshly_generated": 0,
+      "preserved_original_records": 348895,
+      "preserved_ids_order_and_all_scientific_fields": true,
+      "rebuilt_search_plans": true,
+      "blockwise_roundtrip_verified": true
+    }
+  },
+  "scientific_regression": {
+    "suite": "python -m pytest -q",
+    "tests_passed": 1093,
+    "targeted_controls": [
+      "SM [M+H]+ score contributions and existing HG admission",
+      "SM [M+Na]+ weighting and two-of-three HG criterion"
+    ],
+    "real_positive_mzml": {
+      "source_file": "210913_TT1_Iclass_AgingLargeIntestine_01_VialNo60_SPF_M_19m_Pos.mzML",
+      "before_protonated_sm": 90,
+      "after_protonated_sm": 90,
+      "compared_common_sm": 90,
+      "changed_sm_scores": 47,
+      "unchanged_other_rows": 145,
+      "control_sodium_sm": 7,
+      "example_before": {
+        "native_id": "sample=1 period=1 cycle=425 experiment=7",
+        "compound_class": "SM",
+        "adduct": "[M+H]+",
+        "matched_name": "SM(t22:1)",
+        "library_species_name": "SM(t22:1)",
+        "matched_fragment_count": 3,
+        "total_score": 79.1334,
+        "hg_score": 62.46676490688577,
+        "other_score": 16.666666666666664,
+        "fah_score": 0.0,
+        "lcb_score": 0.0,
+        "resolution_level": "species_level",
+        "precursor_mz": 551.3798449112624
+      },
+      "example_after": {
+        "native_id": "sample=1 period=1 cycle=425 experiment=7",
+        "compound_class": "SM",
+        "adduct": "[M+H]+",
+        "matched_name": "SM(t22:1)",
+        "library_species_name": "SM(t22:1)",
+        "matched_fragment_count": 3,
+        "total_score": 76.6401,
+        "hg_score": 49.973411925508614,
+        "other_score": 26.666666666666664,
+        "fah_score": 0.0,
+        "lcb_score": 0.0,
+        "resolution_level": "species_level",
+        "precursor_mz": 551.3798449112624
+      }
+    },
+    "review_figure": {
+      "run": "0-5min-9-25V.mzML",
+      "xcms_peak": "CP26248",
+      "verified_local_peaks": 43501,
+      "annotation_count": 22,
+      "verified_matched_peaks": 8
+    }
+  }
+}

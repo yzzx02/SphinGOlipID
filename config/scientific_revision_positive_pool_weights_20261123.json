@@ -1,0 +1,11 @@
+{
+  "revision": "sphingolipid-positive-pool-weights-20261123-r2",
+  "previous_revision": "sphingolipid-acidic-pool-weights-20261123-r1",
+  "immutable_upstream_manifest": "config/engine_revision.json",
+  "reference_library_rules_sha256": "a769fefccb45202760612e4a742a46af1068d74598155fbd47bc0ac96a9afecb",
+  "scope": "Application scoring over unmodified positive reference admission and library records. Negative scoring is unchanged.",
+  "default_weights_pct_by_pool_count": {"3": [60, 20, 20], "2": [60, 40]},
+  "other": "Independent positive-intensity matched centroids from the prepared spectrum. No additional 0.5% base-peak cutoff. Capacity is unchanged.",
+  "gm3": "Retains two strongest independently matched HG peaks averaged before saturation. Composition-specific LCB confirmation is unchanged.",
+  "audit": "Export actual weights, pool scores and Other scoring-fragment indexes."
+}

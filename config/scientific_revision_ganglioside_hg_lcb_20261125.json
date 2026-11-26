@@ -1,0 +1,19 @@
+{
+  "revision": "sphingolipid-ganglioside-hg-lcb-20261125-r2",
+  "previous_application_revision": "sphingolipid-ecn-pool-weights-20261125-r1",
+  "library_checkpoint": "config/scientific_revision_half_hg_20261124.json",
+  "upstream_manifest": "config/engine_revision.json",
+  "application_scoring_sha256": "bb9a7089d75cbba6f1469c80981793cb45f18185bdf7b59240ed23a5d7eb0200",
+  "engine_sha256": "c46b356335ca876ecd7e23117170af54e09d81c2c9942a3ad4fab5550654d84f",
+  "positive_classes": ["GM1", "GD1", "GT1", "GD3"],
+  "weights_pct": {"hg": 60, "lcb": 20, "other": 20},
+  "headgroup_score": "Strongest distinct matched Diagnostic_HG or Diagnostic_B product.",
+  "lcb_score": "Strongest composition-specific LCB-H2O or LCB-2H2O product at or above 1% of the original base peak.",
+  "other_score": "Distinct auxiliary peaks strictly above 0.5% of the original base peak, capped at three eligible channels.",
+  "admission": "Two distinct Y/Z peaks including Y0 or Z0, two distinct B peaks, NeuAc, and an extended HexNAc signature for GM1, GD1 and GT1.",
+  "verification": {
+    "suite": "python -m pytest -q",
+    "tests_passed": 1161,
+    "benchmark_rerun": false
+  }
+}

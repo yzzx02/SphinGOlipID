@@ -1,0 +1,16 @@
+{
+  "revision": "sphingolipid-acidic-pool-weights-20261123-r1",
+  "previous_revision": "sphingolipid-sm-protonated-6040-20261121-r1",
+  "immutable_upstream_manifest": "config/engine_revision.json",
+  "reference_library_rules_sha256": "a769fefccb45202760612e4a742a46af1068d74598155fbd47bc0ac96a9afecb",
+  "reference_library_scope": "Unmodified library and vendor fingerprint; scoring profile and one supplementary product are applied at runtime after reference admission.",
+  "application_scoring_module": "src/sphingolipid_toolkit/acidic_scoring.py",
+  "gm3_protonated": {
+    "default_weights_pct": {"hg": 60, "lcb": 20, "other": 20},
+    "hg": {"channels": "Six Y/Z channels, B1 and dehydrated B1", "prior_to_saturation": "mean of at most two strongest distinct matched peaks", "k": 0.10},
+    "lcb": {"channels": "candidate-specific LCB-H2O or LCB-2H2O", "original_base_peak_min_inclusive": 0.01, "k": 0.05},
+    "other": {"original_base_peak_min_exclusive": 0.005, "observations_for_saturation": 3, "supplementary_product": "Z0-H2O"},
+    "admission": "Reference Y/Z >= 3 and B >= 2. Shared chain confirmation is separate."
+  },
+  "remaining_acidic_profiles": "Per-class positive ion weight overrides with existing default pools and fixed evidence admission. Negative ion profiles retain reference scoring."
+}

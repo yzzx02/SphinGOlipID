@@ -1,0 +1,148 @@
+{
+  "revision": "sphingolipid-positive-structural-pools-20261125-r4",
+  "QC_source": "20240422-Agilent/2D-MSMS",
+  "QC_reference": "Author-reported QC annotation workbook",
+  "QC_inclusion": "Explicit author-reported chains inside existing acyl and LCB limits. Two distinct composition-specific dehydration products in the same targeted positive MS2 scan, each within 20 ppm and at least 1% of its base peak.",
+  "interpretation": "These are prospective library candidates. The QC scans do not establish a new class-confirmed identification. A new sample must meet the class-specific headgroup gate and match an independently observed LCB product. The named hydroxyacyl family comes from the source and does not localize an OH position.",
+  "entries": [
+    {
+      "name": "PG-Cer(d18:2/16:0)",
+      "formula": "C37H72NO8P",
+      "adduct": "[M+H]+",
+      "source_kind": "reported QC candidate, independently observed LCB products",
+      "source_sheet": "DN",
+      "source_row": 325,
+      "acquisition": "0-5/0-5min-6-40V.d",
+      "scan_id": 640240,
+      "collision_energy_eV": 40,
+      "rt_min": 10.6705333,
+      "observed_precursor_mz": 690.5038,
+      "library_lcb_channels": [
+        "LCB-H2O",
+        "LCB-2H2O"
+      ],
+      "measured_lcb_products": [
+        {
+          "name": "LCB-H2O",
+          "mz": 280.268494,
+          "fraction_of_base_peak": 0.014014
+        },
+        {
+          "name": "LCB-2H2O",
+          "mz": 262.248545,
+          "fraction_of_base_peak": 0.027412
+        }
+      ],
+      "class_gate_and_lcb_together_in_reviewed_QC_scans": false
+    },
+    {
+      "name": "CAEP(d18:2/h28:2)",
+      "formula": "C48H91N2O6P",
+      "adduct": "[M+H]+",
+      "source_kind": "reported QC candidate, independently observed LCB products",
+      "source_sheet": "排列好的，放论文",
+      "source_row": 981,
+      "acquisition": "5-15/(5-15)-3-40V.d",
+      "scan_id": 1433163,
+      "collision_energy_eV": 40,
+      "rt_min": 23.8859167,
+      "observed_precursor_mz": 823.6688,
+      "library_lcb_channels": [
+        "LCB-H2O",
+        "LCB-2H2O"
+      ],
+      "measured_lcb_products": [
+        {
+          "name": "LCB-H2O",
+          "mz": 280.260469,
+          "fraction_of_base_peak": 0.021631
+        },
+        {
+          "name": "LCB-2H2O",
+          "mz": 262.256004,
+          "fraction_of_base_peak": 0.027945
+        }
+      ],
+      "class_gate_and_lcb_together_in_reviewed_QC_scans": false
+    },
+    {
+      "name": "CAEP(d18:2/h27:2)",
+      "formula": "C47H89N2O6P",
+      "adduct": "[M+H]+",
+      "source_kind": "reported QC candidate, independently observed LCB products",
+      "source_sheet": "排列好的，放论文",
+      "source_row": 980,
+      "acquisition": "5-15/(5-15)-6-25V.d",
+      "scan_id": 1398372,
+      "collision_energy_eV": 25,
+      "rt_min": 23.3060667,
+      "observed_precursor_mz": 809.6544,
+      "library_lcb_channels": [
+        "LCB-H2O",
+        "LCB-2H2O"
+      ],
+      "measured_lcb_products": [
+        {
+          "name": "LCB-H2O",
+          "mz": 280.263407,
+          "fraction_of_base_peak": 0.295361
+        },
+        {
+          "name": "LCB-2H2O",
+          "mz": 262.252863,
+          "fraction_of_base_peak": 1.0
+        }
+      ],
+      "class_gate_and_lcb_together_in_reviewed_QC_scans": false
+    },
+    {
+      "name": "CAEP(d18:2/h25:2)",
+      "formula": "C45H85N2O6P",
+      "adduct": "[M+H]+",
+      "source_kind": "reported QC candidate, independently observed LCB products",
+      "source_sheet": "排列好的，放论文",
+      "source_row": 979,
+      "acquisition": "5-15/(5-15)-2-40V.d",
+      "scan_id": 1350219,
+      "collision_energy_eV": 40,
+      "rt_min": 22.5035167,
+      "observed_precursor_mz": 781.6229,
+      "library_lcb_channels": [
+        "LCB-H2O",
+        "LCB-2H2O"
+      ],
+      "measured_lcb_products": [
+        {
+          "name": "LCB-H2O",
+          "mz": 280.264538,
+          "fraction_of_base_peak": 0.260345
+        },
+        {
+          "name": "LCB-2H2O",
+          "mz": 262.252621,
+          "fraction_of_base_peak": 1.0
+        }
+      ],
+      "class_gate_and_lcb_together_in_reviewed_QC_scans": false
+    },
+    {
+      "name": "CAEP(d18:3/16:0)",
+      "formula": "C36H69N2O5P",
+      "adduct": "[M+H]+",
+      "source_kind": "published chain assignment",
+      "publication": "https://doi.org/10.1002/jms.3832",
+      "location": "Table 1, entry 26, Figure 3 and Scheme 1",
+      "observed_precursor_mz": 641.5021,
+      "library_lcb_channels": [
+        "LCB-2H2O"
+      ],
+      "measured_lcb_products": [
+        {
+          "name": "LCB-2H2O",
+          "mz": 260.24,
+          "reported_decimals": 2
+        }
+      ]
+    }
+  ]
+}

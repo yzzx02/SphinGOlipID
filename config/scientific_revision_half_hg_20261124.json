@@ -1,0 +1,151 @@
+{
+  "revision": "sphingolipid-half-hg-20261124-r2",
+  "previous_application_revision": "sphingolipid-hg8-20261124-r1",
+  "application_scoring_sha256": "5437c43f3fb882ef0238d43968b0fc916808f7fffd39f987fcf9af08e9c10342",
+  "engine_sha256": "920f4c8b09407f9047c8fc23fe54e536a63d3a4528b325f04be1b80ef964bb7c",
+  "libraries": {
+    "positive": {
+      "rules_sha256": "2c6b6a14c52648bd514e1667384ed20c03ad1baa43b8ead3021eb373950ee7b3",
+      "records": 753559,
+      "library_sha256": "f6794f32a3fdc0313667396879bb3fa3904d2d6ea3c11111ad822cc7fa5f5298",
+      "index_sha256": "7294e8667385b0e8c8fecf52ce142a1399c4780aad7b593b9221c0931b6969b7",
+      "previous_index_sha256": "d41f085f44d452b6b920ad4aab8f2327a0fc020713c9f61b52c0d1a75fe975b4",
+      "normalized_source_records": 745824,
+      "new_record_ids": []
+    },
+    "negative": {
+      "rules_sha256": "2c6b6a14c52648bd514e1667384ed20c03ad1baa43b8ead3021eb373950ee7b3",
+      "records": 348895,
+      "library_sha256": "c05a165449ff9be6b5fc93a05ee619b2c141edde3256181bf5a84c5e58a4d4f9",
+      "index_sha256": "89c7dbca1abf5a7d768154418db7159513e4ed26319f62b533110b2b5cd1b7c7",
+      "previous_index_sha256": "435db222d214ac812d2602d56c79de8654fd0693c2c4b33027197c25b5888dc7",
+      "normalized_source_records": 348895,
+      "new_record_ids": []
+    }
+  },
+  "unchanged_reference_snapshot": "config/engine_revision.json",
+  "core_limit_per_positive_precursor": 8,
+  "combined_HG_admission": {
+    "GM2": [
+      "[M+H]+",
+      "[M+NH4]+"
+    ],
+    "GM3": [
+      "[M+H]+"
+    ],
+    "minimum_fraction": 0.5,
+    "distinct_measured_peaks": true
+  },
+  "gm2_core": [
+    "Y0",
+    "Z0",
+    "Y2beta",
+    "B1alpha",
+    "B1alpha-H2O",
+    "B2Y2alpha",
+    "B2",
+    "B3"
+  ],
+  "gm2_ammonium": {
+    "identity": "GM2(36:1;O2)",
+    "resolution": "sum composition",
+    "source_dataset": "GPST000446",
+    "source_ion_mz": 1401.8567
+  },
+  "gm2_gm3_weights_pct": [
+    60,
+    20,
+    20
+  ],
+  "gm1_gd1_gt1_gd3_weights_pct": [
+    50,
+    25,
+    25
+  ],
+  "other_min_raw_fraction_exclusive": 0.005,
+  "chain_min_raw_fraction_inclusive": 0.01,
+  "verification": {
+    "suite": "python -m pytest -q",
+    "tests_passed": 1147,
+    "max_core_HG_channels_per_positive_precursor": 8,
+    "positive_entries_checked": 753559,
+    "eligible_queries": 4556,
+    "author_references": 440,
+    "retained_native_rank": 1,
+    "fragment_tolerance_Da": 0.3,
+    "precursor_tolerance_ppm": 10,
+    "recall": {
+      "Standards": [
+        60,
+        62
+      ],
+      "Mouse brain": [
+        68,
+        80
+      ],
+      "Plasma": [
+        51,
+        64
+      ],
+      "GPST000446 human brain": [
+        67,
+        130
+      ],
+      "Porcine GSL (NC 2024)": [
+        86,
+        104
+      ]
+    },
+    "pooled_recall": [
+      332,
+      440
+    ],
+    "benchmark_input_sha256": "83b2adf34e06ba640c15bed02586657de65cb45ad56ca137e2d0fe3ed168a0b4",
+    "benchmark_reference_sha256": "edd4ca448e9e126f9b3850b74e33d0b3ddfb95d1500168ebf9baed0128fe4fc8",
+    "Gal-Fuc-GM1_by_adduct": {
+      "[M+2H-H2O]2+": 5410,
+      "[M+2H]2+": 5410,
+      "[M+H+NH4]2+": 5410,
+      "[M+2NH4]2+": 5410,
+      "[M+H-H2O]+": 5410,
+      "[M+H]+": 5410,
+      "[M+NH4]+": 5410
+    },
+    "GM2_GM3_pool_sizes": {
+      "('GM3', '[M+H]+', 8)": 1320,
+      "('GM2', '[M+H]+', 8)": 1320,
+      "('GM2', '[M+NH4]+', 8)": 1
+    },
+    "human_brain_GM2_GM3": {
+      "GM2": {
+        "recalled_compositions": 1,
+        "supporting_queries": 7,
+        "query_count_by_composition": {
+          "('GM2', 36, 1, 2)": 7
+        }
+      },
+      "GM3": {
+        "recalled_compositions": 2,
+        "supporting_queries": 36,
+        "query_count_by_composition": {
+          "('GM3', 36, 1, 2)": 25,
+          "('GM3', 38, 1, 2)": 11
+        }
+      }
+    },
+    "admission_boundary_cases": {
+      "GM2 [M+H]+": {
+        "three_of_eight_rejected": 56,
+        "four_of_eight_accepted": 70
+      },
+      "GM2 [M+NH4]+": {
+        "three_of_eight_rejected": 56,
+        "four_of_eight_accepted": 70
+      },
+      "GM3 [M+H]+": {
+        "three_of_eight_rejected": 56,
+        "four_of_eight_accepted": 70
+      }
+    }
+  }
+}

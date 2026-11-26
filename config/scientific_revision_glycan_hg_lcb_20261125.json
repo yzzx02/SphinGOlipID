@@ -1,0 +1,16 @@
+{
+  "revision": "sphingolipid-glycan-hg-lcb-20261125-r3",
+  "previous_application_revision": "sphingolipid-ganglioside-hg-lcb-20261125-r2",
+  "library_checkpoint": "config/scientific_revision_half_hg_20261124.json",
+  "upstream_manifest": "config/engine_revision.json",
+  "application_scoring_sha256": "f74fd6eb0bb36d1e3991a90740f54e23d430cb11025e5f65e35737a95d08ff29",
+  "engine_sha256": "6e23e524c03baad20062c5013f262ccd156a47f68876f9f52952ba5622d507b1",
+  "additional_positive_classes": ["GD2", "Gal-Fuc-GM1", "Gal-Fuc-GD1"],
+  "additional_composition_classes": "All 32 positive_catalog_glycosphingolipid.PROFILES entries",
+  "weights_pct": {"hg": 60, "lcb": 20, "other": 20},
+  "headgroup_products": ["Diagnostic_HG", "Diagnostic_B"],
+  "headgroup_intensity": "GD2 averages the two strongest distinct diagnostic products. The other newly grouped families use the strongest diagnostic product.",
+  "lcb_intensity": "Strongest library LCB-H2O or LCB-2H2O at or above 1% of the original base peak. Entries with no library LCB product score zero in this pool.",
+  "admission": "Retain each precursor's reference diagnostic requirements.",
+  "verification": {"suite": "python -m pytest -q", "passed": 1162, "benchmark_rerun": false}
+}

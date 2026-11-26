@@ -1,0 +1,26 @@
+{
+  "revision": "sphingolipid-sm-nl-20261123-r3",
+  "previous_revision": "sphingolipid-positive-pool-weights-20261123-r2",
+  "immutable_upstream_manifest": "config/engine_revision.json",
+  "reference_library_rules_sha256": "a769fefccb45202760612e4a742a46af1068d74598155fbd47bc0ac96a9afecb",
+  "scope": "Protonated SM candidates in the application scoring layer, after reference admission.",
+  "fragment": {
+    "name": "M+H-183",
+    "neutral_formula": "C5H14NO4P",
+    "neutral_mass_da": 183.06604493235,
+    "fragment_type": "NL",
+    "scoring_pool": "other",
+    "intensity_requirement": "Strictly above 0.5% of the raw spectrum base peak for scoring credit."
+  },
+  "audit": "Export the observed and theoretical fragment mass, actual pool assignment and scoring credit in the candidate evidence.",
+  "verification": {
+    "spectrum": "Figure S5E, SM(d18:1/22:3) [M+H]+",
+    "fragment_tolerance_ppm": 20,
+    "observed_fragment_mz": 598.5537423721873,
+    "theoretical_fragment_mz": 598.55575506765,
+    "matched_fragment_count_before": 6,
+    "matched_fragment_count_after": 7,
+    "other_score": 40.0,
+    "final_score": 100.0
+  }
+}

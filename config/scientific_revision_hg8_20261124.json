@@ -1,0 +1,97 @@
+{
+  "revision": "sphingolipid-hg8-20261124-r1",
+  "previous_application_revision": "sphingolipid-sm-nl-20261123-r3",
+  "application_scoring_sha256": "5775d457cd2be394912eeb246708543b66229d4febfb15b7cb77c6c5c0cb5e95",
+  "engine_sha256": "92906f0bbb027f08004a77864b970a102fc3fce22ae5a6375000cd65e7d53d85",
+  "libraries": {
+    "positive": {
+      "rules_sha256": "c33906c14ec3d6928bf8d2822177642aeae7d6ed7a171765f5e41110d2d95eb5",
+      "records": 753559,
+      "library_sha256": "f6794f32a3fdc0313667396879bb3fa3904d2d6ea3c11111ad822cc7fa5f5298",
+      "index_sha256": "d41f085f44d452b6b920ad4aab8f2327a0fc020713c9f61b52c0d1a75fe975b4",
+      "previous_index_sha256": "c1623ea074e040e6c348060f1d7c9e5ba3640624a00e0842ddebe23b6144107a",
+      "normalized_source_records": 745824,
+      "new_record_ids": [
+        1816776
+      ]
+    },
+    "negative": {
+      "rules_sha256": "c33906c14ec3d6928bf8d2822177642aeae7d6ed7a171765f5e41110d2d95eb5",
+      "records": 348895,
+      "library_sha256": "c05a165449ff9be6b5fc93a05ee619b2c141edde3256181bf5a84c5e58a4d4f9",
+      "index_sha256": "435db222d214ac812d2602d56c79de8654fd0693c2c4b33027197c25b5888dc7",
+      "previous_index_sha256": "d9ac075d1398b30f07c71c382ffd32ac3b52d84aa0cf07d9831ae002f11bfcbd",
+      "normalized_source_records": 348895,
+      "new_record_ids": []
+    }
+  },
+  "unchanged_reference_snapshot": "config/engine_revision.json",
+  "core_limit_per_positive_precursor": 8,
+  "gm2_core": [
+    "Y0",
+    "Z0",
+    "Y2beta",
+    "B1alpha",
+    "B1alpha-H2O",
+    "B2Y2alpha",
+    "B2",
+    "B3"
+  ],
+  "gm2_ammonium": {
+    "identity": "GM2(36:1;O2)",
+    "resolution": "sum composition",
+    "source_dataset": "GPST000446",
+    "source_ion_mz": 1401.8567
+  },
+  "gm2_gm3_weights_pct": [
+    60,
+    20,
+    20
+  ],
+  "gm1_gd1_gt1_gd3_weights_pct": [
+    50,
+    25,
+    25
+  ],
+  "other_min_raw_fraction_exclusive": 0.005,
+  "chain_min_raw_fraction_inclusive": 0.01,
+  "verification": {
+    "suite": "python -m pytest -q",
+    "tests_passed": 1146,
+    "max_core_HG_channels_per_positive_precursor": 8,
+    "positive_entries_checked": 753559,
+    "eligible_queries": 4556,
+    "author_references": 440,
+    "retained_native_rank": 1,
+    "fragment_tolerance_Da": 0.3,
+    "precursor_tolerance_ppm": 10,
+    "recall": {
+      "Standards": [
+        60,
+        62
+      ],
+      "Mouse brain": [
+        68,
+        80
+      ],
+      "Plasma": [
+        51,
+        64
+      ],
+      "GPST000446 human brain": [
+        67,
+        130
+      ],
+      "Porcine GSL (NC 2024)": [
+        86,
+        104
+      ]
+    },
+    "pooled_recall": [
+      332,
+      440
+    ],
+    "benchmark_input_sha256": "83b2adf34e06ba640c15bed02586657de65cb45ad56ca137e2d0fe3ed168a0b4",
+    "benchmark_reference_sha256": "edd4ca448e9e126f9b3850b74e33d0b3ddfb95d1500168ebf9baed0128fe4fc8"
+  }
+}

@@ -4,7 +4,7 @@
 3-keto Cer,,False,1593,0,reference_only_ambiguous_modification
 Aleb,Hex3HexNAc2Fuc2Cer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid
 Bleb,Hex4HexNAcFuc2Cer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid
-CAEP,CAEP,True,944,268,ms2_composition_covered; outside_current_eligible_library_grid
+CAEP,CAEP,True,944,271,ms2_composition_covered; outside_current_eligible_library_grid
 CHS,Hex2HexNAc3FucCer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid
 CPS,Hex2HexNAc2FucCer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid
 Cer,Cer,True,7738,2445,ms2_composition_covered; outside_current_eligible_library_grid
@@ -77,7 +77,7 @@ Ley-6,Hex3HexNAcFuc2Cer,True,531,204,ms2_composition_covered; outside_current_el
 Ley-8,Hex4HexNAc2Fuc2Cer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid
 Ley-A-9,Hex4HexNAc2Fuc3Cer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid
 Lyso-SM,LSM,True,114,38,ms2_composition_covered; outside_current_eligible_library_grid
-Lyso-sulfo,SHexSPB,True,114,35,ms2_composition_covered; outside_current_eligible_library_grid
+Lyso-sulfo,SHexSPB,True,114,36,ms2_composition_covered; outside_current_eligible_library_grid
 M(IP)2C,MIP2C,True,531,0,outside_current_eligible_library_grid
 MIPC,Hex-IPC,True,531,0,outside_current_eligible_library_grid
 ManManGlcCer,Hex3Cer,True,531,204,ms2_composition_covered; outside_current_eligible_library_grid

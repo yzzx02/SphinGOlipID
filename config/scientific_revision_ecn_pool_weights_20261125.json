@@ -1,0 +1,42 @@
+{
+  "revision": "sphingolipid-ecn-pool-weights-20261125-r1",
+  "previous_application_revision": "sphingolipid-half-hg-20261124-r2",
+  "library_checkpoint": "config/scientific_revision_half_hg_20261124.json",
+  "unchanged_reference_snapshot": "config/engine_revision.json",
+  "application_scoring_sha256": "69a16fa2edbc0159bc028500e129c034644bfcef797388e5522e11a43ef268b3",
+  "engine_sha256": "54d10e012dbf8515138eaa18a507197bcbe65e1f2b044930c999c4869d357b1b",
+  "rt_iup_sha256": "f97bf082bd1b8f0143d7325102cef38cfab282f66b164ad5748811bf21b26fd2",
+  "positive_pool_weights_pct": {
+    "classes": ["GM1", "GD1", "GT1", "GD3"],
+    "hg": 60,
+    "b": 20,
+    "other": 20
+  },
+  "ecn": {
+    "fit_methods": ["IOLS", "RANSAC"],
+    "fit_input": "One median RT per fatty acyl carbon number",
+    "rt_residual_window_min_default": 0.2,
+    "window_applies_to": ["RANSAC initial consensus", "final recovery for both methods"],
+    "recovery_input": "Original distinct carbon number and RT pairs",
+    "fit_r_squared_minimum_default": 0.99,
+    "require_increasing_rt_on_fitted_carbon_range": true,
+    "minimum_distinct_carbons": {"linear": 3, "quadratic": 4},
+    "selection": "Linear first, final recovered count, fit R-squared, IOLS on an exact tie"
+  },
+  "verification": {
+    "suite": "python -m pytest -q",
+    "tests_passed": 1150,
+    "benchmark_input_sha256": "83b2adf34e06ba640c15bed02586657de65cb45ad56ca137e2d0fe3ed168a0b4",
+    "benchmark_reference_sha256": "edd4ca448e9e126f9b3850b74e33d0b3ddfb95d1500168ebf9baed0128fe4fc8",
+    "benchmark_queries": 4556,
+    "previous_membership_reproduced": true,
+    "native_top1_recall": {
+      "Standards": [60, 62],
+      "Mouse brain": [68, 80],
+      "Plasma": [51, 64],
+      "GPST000446 human brain": [70, 130],
+      "Porcine GSL (NC 2024)": [86, 104],
+      "Pooled five experiments": [335, 440]
+    }
+  }
+}
