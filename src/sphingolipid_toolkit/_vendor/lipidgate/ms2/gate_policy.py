@@ -698,6 +698,9 @@ def _sphingolipid_library_evidence(record):
         identity_valid = pe_cer_from_name(record.lipid_chain_name) is not None
     if is_positive_extended_ganglioside(record.compound_class,record.adduct):
         identity_valid=identity_valid and extended_ganglioside_from_name(record.lipid_chain_name,record.compound_class) is not None
+    elif record.compound_class == 'GM2' and adduct == '[M+NH4]+':
+        identity_valid = (record.lipid_chain_name == record.lipid_name
+                          and re.fullmatch(r'GM2\(d\d+:\d+\)', record.lipid_name) is not None)
     elif is_positive_ganglioside(record.compound_class, record.adduct):
         identity_valid = identity_valid and re.fullmatch(
             rf"{record.compound_class}\(d\d+:\d+/\d+:\d+\)", record.lipid_chain_name) is not None

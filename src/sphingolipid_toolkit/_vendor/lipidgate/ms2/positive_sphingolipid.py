@@ -13,8 +13,7 @@ CLASS_KEYS = frozenset(rule.lipid_class.upper().replace("-", "")
 }
 OTHER_MIN_RELATIVE_INTENSITY = 0.005
 ACYL_MAX_DOUBLE_BONDS = 3
-LCB_MAX_DOUBLE_BONDS = 2
-LCB_THREE_DOUBLE_BOND_CARBONS = frozenset({18})
+LCB_MAX_DOUBLE_BONDS = 3
 _CHAIN = re.compile(r"(?<![A-Za-z0-9])(?P<prefix>[mdth]|O-|P-)?(?P<carbon>\d+):(?P<db>\d+)", re.IGNORECASE)
 _LCB = re.compile(r"(?P<prefix>[mdt])(?P<carbon>\d+):(?P<db>\d+)", re.IGNORECASE)
 _SINGLE_LCB_CLASSES = frozenset({"SPB", "SPH", "DHSPH", "PHYTOSPH", "LSM", "S1P", "HEXSPB", "HEX3SPB", "SHEXSPB", "KETOSPB"})
@@ -60,12 +59,12 @@ def chain_double_bond_violations(chain_name: str, compound_class: str) -> tuple[
     reasons = []
     if any(db > ACYL_MAX_DOUBLE_BONDS for _, db in acyls):
         reasons.append('acyl_double_bonds_above_3')
-    if any(db > LCB_MAX_DOUBLE_BONDS + (carbon in LCB_THREE_DOUBLE_BOND_CARBONS) for carbon, db in lcbs):
-        reasons.append('lcb_double_bonds_outside_c18_exception')
+    if any(db > LCB_MAX_DOUBLE_BONDS for _, db in lcbs):
+        reasons.append('lcb_double_bonds_above_3')
     return tuple(reasons)
 
 
 def impossible_two_chain_sum_double_bonds(chain_name: str) -> bool:
     """A necessary total bound only; never assign an acyl or LCB from a sum."""
     match = _TWO_CHAIN_SUM.fullmatch(chain_name)
-    return match is not None and int(match['db']) > ACYL_MAX_DOUBLE_BONDS + LCB_MAX_DOUBLE_BONDS + 1
+    return match is not None and int(match['db']) > ACYL_MAX_DOUBLE_BONDS + LCB_MAX_DOUBLE_BONDS

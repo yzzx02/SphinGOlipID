@@ -68,11 +68,13 @@ CHAIN_COMPOSITION = re.compile(r"(?:\(|\s)([mdt])(\d+):(\d+)/(h?)(\d+):(\d+)\)?$
 
 def is_positive_hexosylceramide(compound_class: str, adduct: str) -> bool:
     return (adduct == "[M+H]+" and compound_class in CLASSES
+            or compound_class == "GM2" and adduct == "[M+NH4]+"
             or is_positive_extended_ganglioside(compound_class,adduct))
 
 
 def is_positive_ganglioside(compound_class: str, adduct: str) -> bool:
     return (adduct == "[M+H]+" and compound_class in _GANGLIOSIDE_IONS
+            or compound_class == "GM2" and adduct == "[M+NH4]+"
             or is_positive_extended_ganglioside(compound_class,adduct))
 
 

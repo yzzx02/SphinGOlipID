@@ -371,6 +371,10 @@ def _normalize_targeted_positive_sphingolipid_fragments(
             _fragment_with_role(water_loss, "Common"),
             _fragment_with_role(trimethylamine_loss, "Common"),
         ]
+        for mz, name in POSITIVE_CHOLINE_COMMON_FRAGMENTS:
+            role = "Diagnostic_HG" if name == "[C2H6O4P]+" else "Common"
+            ion = by_name.get(name) or _synthetic_fragment(mz, name, role)
+            curated.append(_fragment_with_role(ion, role))
         if lcb_h2o is not None:
             curated.append(_fragment_with_role(lcb_h2o, LCB_FRAGMENT_TYPE))
         if lcb_2h2o is not None:
@@ -1068,6 +1072,7 @@ def convert_excel_directory_to_msp(input_directory: str | Path, output_path: str
 def normalize_imported_record(record: LibraryRecord) -> LibraryRecord:
     """Explicit legacy import policy, separate from raw MSP decoding."""
     from .oxidized_fragment_policy import normalize_oxidized_fragments
+    from .headgroup_core import curate_headgroup
     current = {"compoundclass": record.compound_class, "name": record.lipid_chain_name,
                "ms1_name": record.lipid_name, "precursormz": record.precursor_mz,
                "precursortype": record.adduct}
@@ -1149,7 +1154,8 @@ def normalize_imported_record(record: LibraryRecord) -> LibraryRecord:
     )
     return normalize_positive_ether_lpc(normalize_negative_lpc_record(normalize_negative_lpe_record(normalize_lpc_sodium(normalize_protonated_single_chain_record(normalize_nae_record(annotate_record_chain_labels(replace(record, compound_class=compound_class, lipid_name=lipid_name,
                    lipid_chain_name=lipid_chain_name,
-                   fragments=sorted(normalized_fragments, key=lambda fragment: fragment.mz)))))))))
+                   fragments=sorted(curate_headgroup(compound_class,adduct,normalized_fragments),
+                                    key=lambda fragment: fragment.mz)))))))))
 
 
 def load_standard_msp(msp_path: str | Path, *, normalize: bool = True) -> List[LibraryRecord]:

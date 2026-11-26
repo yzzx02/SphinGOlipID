@@ -314,6 +314,10 @@ class LipidMS2Searcher:
             hg_only_min_relative_intensity=self.HG_ONLY_FALLBACK_MIN_RELATIVE_INTENSITY,
         )
 
+    def _finalize_candidate(self, spectrum: ExperimentalSpectrum, result: CandidateScore) -> CandidateScore | None:
+        """Allow an application scoring profile to run before filtering and ranking."""
+        return result
+
     def find_candidates(self, precursor_mz: float) -> List[LibraryRecord]:
         left, right = self._find_candidate_index_range(precursor_mz)
         return self.library[left:right]
@@ -1309,7 +1313,9 @@ class LipidMS2Searcher:
                 )
 
             if candidate_score is not None:
-                scored.append(candidate_score)
+                candidate_score = self._finalize_candidate(spectrum, candidate_score)
+                if candidate_score is not None:
+                    scored.append(candidate_score)
         eligible_results = [item for item in scored if self._passes_min_total_score(item)]
         if (not eligible_results and type(self) is LipidMS2Searcher and
                 getattr(self._select_tentative_missing_hg_fallback, '__func__', None) is _PRODUCTION_EMPTY_SELECTOR):

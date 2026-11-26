@@ -5,7 +5,7 @@ to the attributed snapshot. This facade only validates input and adds provenance
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 import hashlib
 from importlib.resources import files
@@ -17,6 +17,9 @@ from typing import Iterable, Sequence
 import pandas as pd
 
 
+ENGINE_REVISION = 'sphingolipid-positive-structural-pools-20261125-r4'
+
+
 @dataclass(frozen=True)
 class IdentificationConfig:
     precursor_ppm: float = 10.0
@@ -26,8 +29,11 @@ class IdentificationConfig:
     min_relative_intensity: float = 0.002
     top_n: int = 3
     library_path: Path | None = None
+    acidic_weights: dict[str, tuple[float, ...]] = field(default_factory=dict)
 
     def __post_init__(self):
+        if self.precursor_ppm is None:
+            raise ValueError('precursor_ppm must be positive and finite')
         for name in ('precursor_ppm', 'fragment_ppm', 'fragment_da'):
             value = getattr(self, name)
             if value is not None and (not math.isfinite(value) or value <= 0):
@@ -42,6 +48,9 @@ class IdentificationConfig:
             raise ValueError('min_relative_intensity must be between 0 and 1')
         if not isinstance(self.top_n, int) or isinstance(self.top_n, bool) or self.top_n < 1:
             raise ValueError('top_n must be a positive integer')
+        if self.acidic_weights:
+            from .acidic_scoring import normalize_acidic_weights
+            object.__setattr__(self, 'acidic_weights', normalize_acidic_weights(self.acidic_weights))
 
 
 def library_path(polarity: str = '+') -> Path:
@@ -81,13 +90,18 @@ class SphingolipidIdentifier:
             from ._vendor.lipidgate.ms2.search import LipidMS2Searcher
             from ._vendor.lipidgate.ms2.positive_sphingolipid import CLASS_KEYS
             selected = self.config.library_path or library_path(polarity)
-            self._searchers[polarity] = LipidMS2Searcher(
+            searcher, options = LipidMS2Searcher, {}
+            if polarity == '+':
+                from .acidic_scoring import AcidicSearcher
+                searcher, options = AcidicSearcher, {'acidic_weights': self.config.acidic_weights}
+            self._searchers[polarity] = searcher(
                 selected, precursor_tolerance_ppm=self.config.precursor_ppm,
                 fragment_tolerance_ppm=self.config.fragment_ppm,
                 fragment_tolerance_da=self.config.fragment_da,
                 min_relative_intensity=self.config.min_relative_intensity,
                 min_total_score=self.config.min_total_score,
                 allowed_classes=tuple(CLASS_KEYS) + ('Hex-IPC',),
+                **options,
             )
         return self._searchers[polarity]
 
@@ -115,7 +129,7 @@ class SphingolipidIdentifier:
             row['reference_class_aliases']='; '.join(reference_aliases_for_class(row['compound_class']))
             row['annotation_engine'] = 'SphinGOlipID'
             row['engine_upstream'] = 'LipidGate'
-            row['engine_revision'] = 'sphingolipid-literature-20261110-r1'
+            row['engine_revision'] = ENGINE_REVISION
             row['ms1_tolerance_ppm'] = self.config.precursor_ppm
             row['ms2_tolerance_ppm'] = self.config.fragment_ppm
             row['ms2_tolerance_da'] = self.config.fragment_da

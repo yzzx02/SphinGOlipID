@@ -71,7 +71,7 @@ def test_text_production_uses_reference_engine_without_legacy_filters(cer_index,
     assert 'ms2_evidence_json' in result and 'lcb_score' in result
 
 
-@pytest.mark.parametrize('kwargs',[{'fragment_ppm':0},{'fragment_da':.3},{'min_total_score':101},{'top_n':0}])
+@pytest.mark.parametrize('kwargs',[{'precursor_ppm':None},{'fragment_ppm':0},{'fragment_da':.3},{'min_total_score':101},{'top_n':0}])
 def test_reference_configuration_rejects_ambiguous_or_invalid_settings(kwargs):
     with pytest.raises(ValueError):IdentificationConfig(**kwargs)
 

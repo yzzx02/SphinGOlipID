@@ -224,22 +224,21 @@ SPHINGOLIPID_RULEBOOK: Dict[str, SphingoRule] = {
         allow_hg_only_fallback=False,
         allow_fah_only_fallback=False,
     ),
-    "GM2_[M+H]+": SphingoRule(
-        lipid_class="GM2",
-        adduct="[M+H]+",
-        required_type_count_groups=[({"Diagnostic_HG"}, 5), ({"Diagnostic_B"}, 4)],
-        only_non_hydroxy_fa=True,
-        allow_hg_only_fallback=False,
-        allow_fah_only_fallback=False,
-    ),
-    "GM3_[M+H]+": SphingoRule(
-        lipid_class="GM3",
-        adduct="[M+H]+",
-        required_type_count_groups=[({"Diagnostic_HG"}, 3), ({"Diagnostic_B"}, 2)],
-        only_non_hydroxy_fa=True,
-        allow_hg_only_fallback=False,
-        allow_fah_only_fallback=False,
-    ),
+    # The positive GM2/GM3 library designates its core Y/Z and B channels
+    # with these two fragment types. Their union is one HG admission pool.
+    **{
+        f"{compound_class}_{adduct}": SphingoRule(
+            lipid_class=compound_class,
+            adduct=adduct,
+            required_type_fraction_groups=[({"Diagnostic_HG", "Diagnostic_B"}, 0.5)],
+            only_non_hydroxy_fa=True,
+            allow_hg_only_fallback=False,
+            allow_fah_only_fallback=False,
+        )
+        for compound_class, adduct in (
+            ("GM2", "[M+H]+"), ("GM2", "[M+NH4]+"), ("GM3", "[M+H]+")
+        )
+    },
     "GM3_[M-H]-": SphingoRule(
         lipid_class="GM3",
         adduct="[M-H]-",
@@ -256,7 +255,7 @@ SPHINGOLIPID_RULEBOOK: Dict[str, SphingoRule] = {
         f"{cls}_{adduct}": SphingoRule(
             lipid_class=cls,adduct=adduct,
             required_all={'Y0','Z0'} if cls in MODIFIED_CLASSES else set(),
-            required_any_groups=[set(NEU_NAMES),*([set(extended_glycan_names(cls))] if cls!='GD3' else []),
+            required_any_groups=[{'Y0','Z0'},set(NEU_NAMES),*([set(extended_glycan_names(cls))] if cls!='GD3' else []),
                                  *([set(modified_core_hg_names(cls)),set(modified_fucose_evidence_names(cls))] if cls in MODIFIED_CLASSES else [])],
             required_type_count_groups=[({'Diagnostic_HG'},2),({'Diagnostic_B'},2)],
             allow_hg_only_fallback=False,allow_fah_only_fallback=False,

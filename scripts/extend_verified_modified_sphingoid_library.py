@@ -105,10 +105,14 @@ def append_dms(source,baseline_index,destination):
         destination_sha256=sha256(destination),eligible_parent_record_id=parent.record_id)
 
 
-def rebuild_verified_index(source,baseline_index,destination,*,allow_dms=False):
+def rebuild_verified_index(source,baseline_index,destination,*,allow_dms=False,additional_identities=(),revision=REVISION,expected_transform=None):
     source,baseline_index,destination=map(Path,(source,baseline_index,destination))
     if destination.exists() or destination.resolve() in {source.resolve(),baseline_index.resolve()}:
         raise ValueError('Use a new, separate SQLite destination')
+    allowed=set(additional_identities)
+    if allow_dms:
+        allowed.add((DMS_CLASS,DMS_NAME,DMS_FORMULA,'[M+H]+'))
+    pending=allowed.copy()
     before=sha256(source);baseline_hash=sha256(baseline_index)
     rules=code_fingerprint(Path(ms2.__file__).parent)
     destination.parent.mkdir(parents=True,exist_ok=True)
@@ -124,7 +128,7 @@ def rebuild_verified_index(source,baseline_index,destination,*,allow_dms=False):
         with closing(IndexedLibrary(baseline_index)) as library:
             for position,record in enumerate(library):
                 stage.execute('INSERT INTO old(ordinal,sig,id,name) VALUES (?,?,?,?)',
-                    (position,signature(record),record.record_id,record.lipid_chain_name))
+                    (position,signature(expected_transform(record) if expected_transform else record),record.record_id,record.lipid_chain_name))
                 maximum_id=max(maximum_id,record.record_id);old_count+=1
                 if old_count%25000==0:stage.commit()
         stage.commit();print('Previous identities verified:',old_count,flush=True)
@@ -135,9 +139,10 @@ def rebuild_verified_index(source,baseline_index,destination,*,allow_dms=False):
             existing=stage.execute('SELECT ordinal,id FROM old WHERE sig=? AND payload IS NULL ORDER BY ordinal LIMIT 1',
                 (signature(record),)).fetchone()
             if existing is None:
-                if (allow_dms and record.compound_class==DMS_CLASS and record.lipid_chain_name==DMS_NAME
-                        and record.formula==DMS_FORMULA and record.adduct=='[M+H]+' and not additions):
-                    additions.append(replace(record,record_id=maximum_id+1));return
+                identity=(record.compound_class,record.lipid_chain_name,record.formula,record.adduct)
+                if identity in pending:
+                    pending.remove(identity)
+                    additions.append(replace(record,record_id=maximum_id+1+len(additions)));return
                 raise ValueError('Fresh normalization differs from previous content: '+record.lipid_chain_name)
             position,identity=existing
             fresh=replace(record,record_id=identity)
@@ -165,7 +170,7 @@ def rebuild_verified_index(source,baseline_index,destination,*,allow_dms=False):
         stage.commit()
         missing=stage.execute('SELECT id,name FROM old WHERE payload IS NULL LIMIT 3').fetchall()
         if matched!=old_count or missing:raise ValueError(f'Missing previous records after fresh normalization: {missing}')
-        if len(additions)!=(1 if allow_dms else 0):raise ValueError('Unexpected appended reference count')
+        if pending:raise ValueError(f'Missing requested reference records: {pending}')
 
         def records():
             for payload, in stage.execute('SELECT payload FROM old ORDER BY ordinal'):
@@ -173,14 +178,14 @@ def rebuild_verified_index(source,baseline_index,destination,*,allow_dms=False):
             yield from additions
 
         metadata=write_streaming_library_index(destination,records(),dict(version=LIBRARY_CACHE_VERSION,
-            source_sha256=before,rules_sha256=rules,revision=REVISION,
+            source_sha256=before,rules_sha256=rules,revision=revision,
             previous_index_sha256=baseline_hash,fresh_normalization=True))
         with closing(IndexedLibrary(baseline_index)) as original,closing(IndexedLibrary(destination)) as revised:
             previous=iter(original);preserved=0;new_ids={r.record_id for r in additions}
             for record in revised:
                 if record.record_id in new_ids:continue
                 old=next(previous)
-                if old.record_id!=record.record_id or scientific_payload(old)!=scientific_payload(record):
+                if old.record_id!=record.record_id or scientific_payload(expected_transform(old) if expected_transform else old)!=scientific_payload(record):
                     raise ValueError('Source IDs, scientific fields or relative order changed')
                 preserved+=1
             if next(previous,None) is not None or preserved!=old_count:raise ValueError('Incomplete index roundtrip')
@@ -188,7 +193,8 @@ def rebuild_verified_index(source,baseline_index,destination,*,allow_dms=False):
         raise ValueError('Source, baseline or rules changed during verification')
     return dict(metadata=metadata,index_sha256=sha256(destination),index_bytes=destination.stat().st_size,
         raw_records_freshly_normalized=raw,derived_records_freshly_generated=derived,
-        preserved_original_records=old_count,preserved_ids_order_and_all_scientific_fields=True,
+        preserved_original_records=old_count,preserved_ids_order_and_all_scientific_fields=expected_transform is None,
+        matched_expected_scientific_fields=True,
         rebuilt_search_plans=True,blockwise_roundtrip_verified=True,new_record_ids=[r.record_id for r in additions])
 
 
@@ -199,10 +205,12 @@ if __name__=='__main__':
     for name in ['source','previous-index','destination','audit']:
         parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--allow-dms',action='store_true',help='Allow exactly the single reviewed DMS addition during rebuild.')
+    parser.add_argument('--revision',default=REVISION,help='Scientific revision assigned to the rebuilt index.')
     args=parser.parse_args()
     if args.audit.exists():parser.error('Use a new audit path')
     result=(append_dms(args.source,args.previous_index,args.destination) if args.operation=='append-dms'
-        else rebuild_verified_index(args.source,args.previous_index,args.destination,allow_dms=args.allow_dms))
+        else rebuild_verified_index(args.source,args.previous_index,args.destination,
+            allow_dms=args.allow_dms,revision=args.revision))
     args.audit.parent.mkdir(parents=True,exist_ok=True)
     args.audit.write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
     print('Verified:',args.destination)

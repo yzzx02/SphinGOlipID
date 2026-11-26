@@ -174,6 +174,7 @@ _NATIVE_EVIDENCE_PRECHECK = object()
 POSITIVE_CHOLINE_POOL_ALIGNMENT_CLASSES = {"ASM", "LPC", "LPCO", "SM", "LSM"}
 POSITIVE_PHOSPHOLIPID_HG_DOMINANT_POOL_WEIGHTS = {"fah": 20.0, "hg": 60.0, "other": 20.0}
 AHEXCER_NEGATIVE_POOL_WEIGHTS = {"fah": 60.0, "hg": 20.0, "other": 20.0}
+SM_PROTONATED_POOL_WEIGHTS = {"fah": 0.0, "hg": 60.0, "other": 40.0}
 SM_SODIUM_POOL_WEIGHTS = {"fah": 0.0, "hg": 75.0, "other": 25.0}
 LPE_SODIUM_POOL_WEIGHTS = {"fah": 0.0, "hg": 75.0, "other": 25.0}
 ADGGA_POSITIVE_POOL_WEIGHTS = {"fah": 20.0, "hg": 60.0, "other": 20.0}
@@ -256,7 +257,9 @@ def _pool_weights_for_record(record: LibraryRecord, rule: ClassRule) -> Dict[str
         return {"fah": 60.0, "hg": 20.0, "other": 20.0}
     if _is_negative_ahexcer_record(record):
         return AHEXCER_NEGATIVE_POOL_WEIGHTS
-    if class_key == "SM" and adduct in {"[M+H]+", "[M+Na]+"}:
+    if class_key == "SM" and adduct == "[M+H]+":
+        return SM_PROTONATED_POOL_WEIGHTS
+    if class_key == "SM" and adduct == "[M+Na]+":
         return SM_SODIUM_POOL_WEIGHTS
     if class_key == "ADGGA" and _is_positive_adduct(record.adduct):
         return ADGGA_POSITIVE_POOL_WEIGHTS

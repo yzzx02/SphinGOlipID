@@ -229,6 +229,12 @@ class SphingolipidRuleTests(unittest.TestCase):
         result = _score(record, [(184.0733, 1000.0), (210.2216, 800.0)])
 
         self.assertTrue(result.passed_required_gates)
+        self.assertEqual(
+            _pool_weights_for_record(record, DEFAULT_RULES.get("SM")),
+            {"fah": 0.0, "hg": 60.0, "other": 40.0},
+        )
+        self.assertAlmostEqual(result.pool_scores["hg"].pool_score, 60.0)
+        self.assertAlmostEqual(result.pool_scores["other"].pool_score, 20.0)
 
     def test_sm_sodium_requires_two_of_three_hg_losses_and_uses_75_25_weights(self) -> None:
         record = LibraryRecord(

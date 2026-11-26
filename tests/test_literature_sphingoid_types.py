@@ -60,10 +60,10 @@ def test_two_dms_head_fragments_admit_without_other_gate(dms_index,second):
     assert rows[0]['hg_score']==60. and rows[0]['other_score']==0.
 
 
-def test_dms_uses_strongest_hg_and_existing_strict_other_threshold(dms_index):
+def test_dms_uses_strongest_hg_and_credits_prepared_other_peaks(dms_index):
     def score(second,other):
         return identify(dms_index,[(110.0964,100.),(84.0808,second),(310.3104,other)])[0]
-    low=score(2.,.5);high=score(80.,.5);supported=score(2.,.5001)
+    low=score(2.,.3);high=score(80.,.5);supported=score(2.,.5001)
     assert low['hg_score']==high['hg_score']==supported['hg_score']==60.
     assert low['other_score']==high['other_score']==0.
     assert supported['other_score']>0.
@@ -164,13 +164,13 @@ def test_packaged_reference_catalog_retains_corrected_unconfirmed_names_outside_
 
 
 def test_packaged_library_dms_is_searchable_with_the_current_engine():
-    from sphingolipid_toolkit.engine import library_path
+    from sphingolipid_toolkit.engine import ENGINE_REVISION
     with SphingolipidIdentifier(IdentificationConfig(top_n=10)) as identifier:
         rows=identifier.identify(328.321006,[(110.0964,100.),(84.0808,70.),(58.0651,40.),(310.3104,20.),(280.2999,10.)])
     dms=[r for r in rows if r['compound_class']==DMS_CLASS]
     assert len(dms)==1 and dms[0]['matched_name']==DMS_NAME
     assert dms[0]['resolution_level']=='species_level'
-    assert dms[0]['engine_revision']=='sphingolipid-literature-20261110-r1'
+    assert dms[0]['engine_revision']==ENGINE_REVISION
 
 
 @pytest.mark.parametrize('tolerance',[{'fragment_ppm':20.},{'fragment_ppm':None,'fragment_da':.3}])
@@ -185,11 +185,11 @@ def test_published_dms_ion_positions_pass_while_spb20_control_does_not(dms_index
 
 
 
-def test_dms_other_threshold_uses_raw_base_peak_even_when_precursor_dominates(dms_index):
+def test_dms_other_credits_weak_match_even_when_precursor_dominates(dms_index):
     def score(optional):
         peaks=[(328.321006,1000.),(110.0964,100.),(84.0808,70.)]
         if optional is not None:peaks.append((310.3104,optional))
         return identify(dms_index,peaks)[0]
-    absent=score(None);equal=score(5.);above=score(5.001)
-    assert equal['other_score']==absent['other_score']
+    absent=score(None);equal=score(5.);below=score(3.);above=score(5.001)
+    assert equal['other_score']==below['other_score']==absent['other_score']
     assert above['other_score']>equal['other_score']
