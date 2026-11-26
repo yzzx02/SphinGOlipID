@@ -81,10 +81,10 @@ def test_report_preserves_ambiguous_peaks_zero_areas_and_audit(result_workbook, 
     with pd.ExcelFile(path) as workbook:
         assert workbook.sheet_names[0] == 'identification_table'
         assert workbook.book['samples']['B2'].data_type == 's'
-        output = workbook.parse('identification_table')
+        output = pd.read_excel(workbook, sheet_name='identification_table')
         assert 'Cer(d18:1/22:0)' not in output.lipid_name.values
         assert 'Cer(d40:1)' in output.lipid_name.values
-        trace = workbook.parse('area_sources')
+        trace = pd.read_excel(workbook, sheet_name='area_sources')
         omitted = trace.loc[~trace.included]
         assert omitted.annotation_excel_row.tolist() == [5] and omitted.report_id.isna().all()
 
